@@ -83,6 +83,7 @@ Detalle de variables y avance: **[AVANCE_PROYECTO.md](./AVANCE_PROYECTO.md)**.
 
 | Archivo | Contenido |
 |---------|-----------|
+| **[MANUAL_DE_USO.md](./MANUAL_DE_USO.md)** | **Guía oficial de usuario por rol (entrega)** |
 | [AVANCE_PROYECTO.md](./AVANCE_PROYECTO.md) | Estado, SQL, env, pendientes |
 | [BarberWeb_Documentacion_Tecnica.md](./BarberWeb_Documentacion_Tecnica.md) | Arquitectura y módulos |
 | [Propuesta_Tecnica_BarberWeb.md](./Propuesta_Tecnica_BarberWeb.md) | Propuesta comercial y uso |

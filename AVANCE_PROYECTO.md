@@ -106,4 +106,4 @@ npm run build    # verificar producción
 
 ---
 
-Documentación relacionada: [README.md](./README.md) · [BarberWeb_Documentacion_Tecnica.md](./BarberWeb_Documentacion_Tecnica.md) · [CambiosMejoras.txt](./CambiosMejoras.txt)
+Documentación relacionada: [MANUAL_DE_USO.md](./MANUAL_DE_USO.md) · [README.md](./README.md) · [BarberWeb_Documentacion_Tecnica.md](./BarberWeb_Documentacion_Tecnica.md) · [CambiosMejoras.txt](./CambiosMejoras.txt)
