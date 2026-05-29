@@ -13,16 +13,15 @@ import {
   Star,
   Calendar,
   ChevronRight,
-  Instagram,
-  Facebook,
   Mail,
-  MessageCircle,
-  Twitter,
   LogOut,
   LayoutDashboard,
   Loader2,
   ShoppingBag
 } from 'lucide-react'
+import { SocialLinks } from '@/components/ui/SocialLinks'
+import { WhatsappFloat } from '@/components/ui/WhatsappFloat'
+import { useSocialLinks } from '@/components/ui/useSocialLinks'
 
 interface UserProfile {
   full_name: string
@@ -46,13 +45,24 @@ interface Producto {
   image_url: string | null
 }
 
+interface PortafolioItem {
+  id: string
+  image_url: string
+  categoria: string
+  descripcion: string
+}
+
 export default function HomePage() {
   const [user, setUser] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [servicios, setServicios] = useState<Servicio[]>([])
   const [productos, setProductos] = useState<Producto[]>([])
+  const [portafolio, setPortafolio] = useState<PortafolioItem[]>([])
+  const [carouselIndex, setCarouselIndex] = useState(0)
   const router = useRouter()
   const supabase = createClient()
+  const socialLinks = useSocialLinks()
+  const contactPhone = process.env.NEXT_PUBLIC_CONTACT_PHONE || '59171234567'
 
   useEffect(() => {
     const checkUserAndData = async () => {
@@ -92,6 +102,16 @@ export default function HomePage() {
 
       if (prodsData) {
         setProductos(prodsData)
+      }
+
+      const { data: portafolioData } = await supabase
+        .from('portafolio')
+        .select('id, image_url, categoria, descripcion')
+        .order('created_at', { ascending: false })
+        .limit(12)
+
+      if (portafolioData) {
+        setPortafolio(portafolioData)
       }
 
       setLoading(false)
@@ -354,6 +374,85 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Galería / Portafolio */}
+      {portafolio.length > 0 && (
+        <section id="galeria" className="py-24 bg-zinc-950 border-t border-white/5">
+          <div className="max-w-7xl mx-auto px-4">
+            <div className="text-center mb-12">
+              <p className="text-amber-400 uppercase tracking-widest text-sm font-bold mb-4">Nuestro trabajo</p>
+              <h2 className="text-5xl font-bold mb-4">Galería</h2>
+              <p className="text-gray-400 max-w-xl mx-auto">
+                Estilos recientes de nuestro equipo. Las fotos se actualizan desde el panel de portafolio.
+              </p>
+            </div>
+
+            <div className="relative aspect-[16/9] max-h-[520px] rounded-2xl overflow-hidden border border-white/10 group">
+              <img
+                src={portafolio[carouselIndex]?.image_url}
+                alt={portafolio[carouselIndex]?.descripcion || 'Trabajo de barbería'}
+                className="w-full h-full object-cover transition-opacity duration-500"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+              <div className="absolute bottom-6 left-6 right-6 flex justify-between items-end gap-4">
+                <div>
+                  <span className="text-xs font-black uppercase tracking-widest text-amber-400">
+                    {portafolio[carouselIndex]?.categoria}
+                  </span>
+                  <p className="text-white font-medium mt-1 max-w-lg">
+                    {portafolio[carouselIndex]?.descripcion || 'Estilo Barber Pro'}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCarouselIndex((i) => (i - 1 + portafolio.length) % portafolio.length)
+                    }
+                    className="w-10 h-10 rounded-full bg-black/50 border border-white/20 hover:bg-amber-500 hover:text-black transition-colors font-bold"
+                    aria-label="Anterior"
+                  >
+                    ‹
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCarouselIndex((i) => (i + 1) % portafolio.length)}
+                    className="w-10 h-10 rounded-full bg-black/50 border border-white/20 hover:bg-amber-500 hover:text-black transition-colors font-bold"
+                    aria-label="Siguiente"
+                  >
+                    ›
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-2 mt-4 overflow-x-auto pb-2">
+              {portafolio.map((item, idx) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setCarouselIndex(idx)}
+                  className={`shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-all ${
+                    idx === carouselIndex ? 'border-amber-500 scale-105' : 'border-white/10 opacity-60 hover:opacity-100'
+                  }`}
+                >
+                  <img src={item.image_url} alt="" className="w-full h-full object-cover" />
+                </button>
+              ))}
+            </div>
+
+            <div className="text-center mt-8">
+              <Link
+                href="/galeria"
+                className="inline-flex items-center gap-2 text-amber-400 font-bold hover:text-amber-300 transition"
+              >
+                Ver galería completa
+                <ChevronRight className="w-5 h-5" />
+              </Link>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* Acerca de */}
       <section id="acerca" className="py-24 bg-black">
         <div className="max-w-7xl mx-auto px-4">
@@ -570,7 +669,12 @@ export default function HomePage() {
                   </div>
                   <div>
                     <h3 className="font-bold mb-1">Teléfono</h3>
-                    <p className="text-gray-400">+591 71234567</p>
+                    <a
+                      href={`tel:+${contactPhone.replace(/\D/g, '')}`}
+                      className="text-gray-400 hover:text-amber-400 transition"
+                    >
+                      +{contactPhone.replace(/(\d{3})(\d+)/, '$1 $2')}
+                    </a>
                   </div>
                 </div>
 
@@ -595,21 +699,7 @@ export default function HomePage() {
                 </div>
               </div>
 
-              {/* Redes sociales */}
-              <div className="flex gap-4 mt-8">
-                <a href="#" className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center hover:bg-amber-400 transition">
-                  <Instagram className="w-5 h-5" />
-                </a>
-                <a href="#" className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center hover:bg-amber-400 transition">
-                  <Facebook className="w-5 h-5" />
-                </a>
-                <a href="#" className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center hover:bg-amber-400 transition">
-                  <Twitter className="w-5 h-5" />
-                </a>
-                <a href="#" className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center hover:bg-amber-400 transition">
-                  <MessageCircle className="w-5 h-5" />
-                </a>
-              </div>
+              <SocialLinks links={socialLinks} size="lg" className="mt-8" />
             </div>
 
             {/* Mapa */}
@@ -646,6 +736,8 @@ export default function HomePage() {
         </div>
       </div>
 
+      <WhatsappFloat href={socialLinks.whatsapp} />
+
       {/* Footer */}
       <footer className="bg-black border-t border-white/10 py-12">
         <div className="max-w-7xl mx-auto px-4">
@@ -655,15 +747,19 @@ export default function HomePage() {
               <span className="text-xl font-bold tracking-wider">BarberSite</span>
             </div>
 
-            <div className="flex flex-wrap justify-center gap-8 text-sm text-gray-400">
-              <a href="#servicios" className="hover:text-amber-400 transition">Servicios</a>
-              <a href="#acerca" className="hover:text-amber-400 transition">Nosotros</a>
-              <a href="#tienda" className="hover:text-amber-400 transition">Tienda</a>
-              <a href="#equipo" className="hover:text-amber-400 transition">Equipo</a>
-              <a href="#contacto" className="hover:text-amber-400 transition">Contacto</a>
+            <div className="flex flex-col items-center gap-6">
+              <div className="flex flex-wrap justify-center gap-8 text-sm text-gray-400">
+                <a href="#servicios" className="hover:text-amber-400 transition">Servicios</a>
+                <a href="#galeria" className="hover:text-amber-400 transition">Galería</a>
+                <a href="#acerca" className="hover:text-amber-400 transition">Nosotros</a>
+                <a href="#tienda" className="hover:text-amber-400 transition">Tienda</a>
+                <a href="#equipo" className="hover:text-amber-400 transition">Equipo</a>
+                <a href="#contacto" className="hover:text-amber-400 transition">Contacto</a>
+              </div>
+              <SocialLinks links={socialLinks} className="flex flex-col items-center" />
             </div>
 
-            <p className="text-gray-500 text-sm">
+            <p className="text-gray-500 text-sm text-center md:text-right">
               © 2026 BarberSite. Todos los derechos reservados. Cochabamba, Bolivia. -k3v1bvo Studios, designed by k3v1bvo-
             </p>
           </div>

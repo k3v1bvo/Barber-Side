@@ -1,90 +1,94 @@
-# 💈 BarberWeb - CRM & POS System
+# BarberSite / BarberWeb — CRM & POS para barberías
 
-**BarberWeb** es una plataforma integral de nivel empresarial diseñada específicamente para la gestión operativa y comercial de barberías modernas. Este ecosistema digital centraliza la gestión de clientes, reservas, control de inventario y análisis de negocios, todo con una experiencia de usuario (UX) moderna bajo un diseño oscuro *Amber & Zinc*.
+Plataforma integral para gestión de citas, personal, inventario, tienda y notificaciones. Diseño **Amber & Zinc** (modo oscuro), roles múltiples y backend en **Supabase**.
 
-![BarberWeb Banner](https://images.unsplash.com/photo-1503951914875-452162b0f3f1?q=80&w=1200&auto=format&fit=crop) *(Imagen ilustrativa)*
-
----
-
-## ✨ Características Principales (Features)
-
-El sistema cuenta con un control de acceso basado en roles (RBAC), dividiendo sus capacidades según el usuario:
-
-*   **👥 Panel de Clientes (Portal B2C):**
-    *   Reservas Inteligentes 24/7 (elección de servicio, barbero y horario).
-    *   **Loyalty Circle:** Gamificación de la lealtad de clientes (descuentos o cortes gratis por recurrencia).
-    *   Tienda Online (E-commerce) con carrito de compras y recojo en local.
-*   **✂️ Panel de Barberos:**
-    *   Gestión de su agenda personal diaria.
-    *   Ventas rápidas ("Walk-ins") para clientes sin cita previa.
-    *   Reloj checador (Control de Asistencia de entrada/salida).
-*   **🛎️ Recepción / Caja:**
-    *   Control maestro del flujo diario (estados: Pendiente, En Proceso, Finalizado).
-    *   Visualización de cierre de caja e ingresos del día en tiempo real.
-*   **📊 Dashboard Administrativo (Admin):**
-    *   **Business Intelligence:** Métricas de productividad por barbero y servicios más vendidos.
-    *   **Inventario Automatizado:** CRUD de productos con alertas de bajo stock.
-    *   **Salón de la Fama:** Identificación de clientes VIP basados en número de visitas y gasto histórico.
-    *   **Portafolio Pro:** Gestión de galería de trabajos alojada en la nube (URL-based storage) para optimización extrema.
+**Repositorio oficial:** [https://github.com/k3v1bvo/BarberSite](https://github.com/k3v1bvo/BarberSite)
 
 ---
 
-## 🛠️ Stack Tecnológico
+## Estructura del repo
 
-*   **Frontend:** [Next.js](https://nextjs.org/) (App Router) y React.
-*   **Estilos:** [Tailwind CSS](https://tailwindcss.com/) (diseño fully responsive).
-*   **Iconos & UI:** `lucide-react` y componentes modulares propios.
-*   **Backend & Base de Datos:** [Supabase](https://supabase.com/) (PostgreSQL + Row Level Security).
-*   **Autenticación:** Supabase Auth + Middleware.
-
----
-
-## 🚀 Instalación y Despliegue Local
-
-Sigue estos pasos para correr el proyecto en tu entorno local:
-
-### 1. Clonar el repositorio
-```bash
-git clone https://github.com/k3v1bvo/barber-web.git
-cd barber-web/barber-pro-web
+```
+BarberWeb/
+├── barber-pro-web/          # App Next.js (código principal)
+├── scripts/                 # Migración Excel → Supabase (Python)
+├── supabase_PENDIENTE_EJECUTAR.sql
+├── supabase_notificaciones.sql
+├── AVANCE_PROYECTO.md       # Estado actual y checklist
+├── BarberWeb_Documentacion_Tecnica.md
+├── Propuesta_Tecnica_BarberWeb.md
+└── CambiosMejoras.txt
 ```
 
-### 2. Instalar dependencias
+---
+
+## Características principales
+
+| Módulo | Descripción |
+|--------|-------------|
+| **Clientes** | Reservas, lealtad, tienda, calendario personal |
+| **Barberos** | Agenda propia, walk-in, asistencia |
+| **Recepción** | Flujo del día, agenda general, POS |
+| **Admin** | KPIs, usuarios, inventario, pedidos, reportes, asistencia |
+| **Agenda** | Vista general + por barbero (semana/día) |
+| **Asistencia** | Entrada/salida, cierre automático 22:00 |
+| **Notificaciones** | In-app (realtime), email (Resend), preferencias |
+| **Landing** | Portafolio, redes, WhatsApp |
+
+---
+
+## Inicio rápido
+
 ```bash
+git clone https://github.com/k3v1bvo/BarberSite.git
+cd BarberSite/barber-pro-web
 npm install
-```
-
-### 3. Configurar Variables de Entorno
-Crea un archivo `.env.local` en la raíz de `barber-pro-web` y agrega tus credenciales de Supabase:
-```env
-NEXT_PUBLIC_SUPABASE_URL=tu-url-de-supabase
-NEXT_PUBLIC_SUPABASE_ANON_KEY=tu-anon-key-de-supabase
-```
-
-### 4. Iniciar el servidor de desarrollo
-```bash
+cp .env.example .env.local   # completar credenciales
 npm run dev
 ```
-La aplicación estará corriendo en [http://localhost:3000](http://localhost:3000).
+
+Abre [http://localhost:3000](http://localhost:3000).
+
+### Supabase
+
+Ejecuta en el SQL Editor (en orden):
+
+1. `supabase_PENDIENTE_EJECUTAR.sql`
+2. `supabase_notificaciones.sql` (si la sección 10 del anterior no se aplicó)
+
+Activa **Realtime** en la tabla `notificaciones` para la campana en vivo.
+
+Detalle de variables y avance: **[AVANCE_PROYECTO.md](./AVANCE_PROYECTO.md)**.
 
 ---
 
-## 📦 Scripts de Migración (Python)
+## Stack
 
-Si necesitas migrar una base de datos antigua (en Excel) al nuevo sistema, dentro de la carpeta `scripts/` encontrarás herramientas automatizadas desarrolladas en Python:
-
-1.  `generar_plantilla.py`: Crea un Excel vacío con las columnas necesarias.
-2.  `migrar_clientes.py`: Lee el Excel, limpia la data y la sube masivamente a la tabla de Supabase sin perder el progreso de "Loyalty Circle" de los clientes.
-
-Para instrucciones detalladas sobre la migración, consulta [scripts/LEEME_MIGRACION.md](./scripts/LEEME_MIGRACION.md).
+- **Frontend:** Next.js 16 (App Router), React 19, Tailwind CSS 4
+- **Backend:** Supabase (PostgreSQL, Auth, RLS)
+- **Email:** Resend
+- **Iconos:** Lucide React
 
 ---
 
-## 🔒 Seguridad
+## Seguridad
 
-*   **Protección de Rutas:** El archivo `middleware.ts` intercepta todas las peticiones, asegurando que solo usuarios con rol de `admin` entren a `/admin`, `barbero` a `/barbero`, etc.
-*   **RLS (Row Level Security):** A nivel de base de datos en Supabase, los usuarios solo tienen permisos de lectura/escritura sobre las filas de datos que les pertenecen.
+- Middleware por rol (`/admin`, `/agenda`, `/barbero`, etc.)
+- RLS en Supabase
+- `.env.local` nunca se sube a Git (ver `.gitignore`)
 
 ---
 
-Hecho con 💻 por el equipo de BarberWeb.
+## Documentación
+
+| Archivo | Contenido |
+|---------|-----------|
+| [AVANCE_PROYECTO.md](./AVANCE_PROYECTO.md) | Estado, SQL, env, pendientes |
+| [BarberWeb_Documentacion_Tecnica.md](./BarberWeb_Documentacion_Tecnica.md) | Arquitectura y módulos |
+| [Propuesta_Tecnica_BarberWeb.md](./Propuesta_Tecnica_BarberWeb.md) | Propuesta comercial y uso |
+| [CambiosMejoras.txt](./CambiosMejoras.txt) | Backlog original vs hecho |
+| [scripts/LEEME_MIGRACION.md](./scripts/LEEME_MIGRACION.md) | Migración de clientes Excel |
+
+---
+
+Desarrollo: **k3v1bvo Studios** · BarberSite Pro

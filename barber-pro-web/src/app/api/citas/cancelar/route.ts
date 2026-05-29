@@ -1,4 +1,6 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { getNotificationDbClient } from '@/lib/supabase/admin'
+import { dispatchCitaCancelada } from '@/lib/notifications/dispatch'
 import { NextResponse } from 'next/server'
 
 export async function POST(request: Request) {
@@ -11,7 +13,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json()
-    const { cita_id } = body
+    const { cita_id, motivo } = body
 
     const { data: cita } = await supabase
       .from('citas')
@@ -49,6 +51,9 @@ export async function POST(request: Request) {
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
+
+    const db = getNotificationDbClient(supabase)
+    await dispatchCitaCancelada(db, cita_id, motivo)
 
     return NextResponse.json({ success: true })
   } catch (error) {

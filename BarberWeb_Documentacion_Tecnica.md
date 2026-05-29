@@ -37,17 +37,36 @@ Nuestro equipo de ingeniería ha estructurado BarberWeb para ser seguro, escalab
 
 ### D. Módulo de Recepción y Barberos
 *   **Recepción y Walk-in:** Gestión rápida del flujo diario, capacidad de registrar clientes de paso ("Walk-ins") y cobrar rápidamente.
-*   **Control de Asistencia (Nuevo):** Reloj checador integrado. Los empleados marcan su entrada y salida digitalmente, generando reportes exactos de horas trabajadas para el cálculo de nómina.
+*   **Control de Asistencia:** Reloj checador, estados (presente, atrasado, ausente, finalizado), cierre automático a las **22:00** y panel admin con edición manual.
+*   **Agenda por barbero:** `/agenda/[id]` con pestañas de calendario, disponibilidad y configuración de horario/bloqueos.
+
+### E. Calendarios y agenda (2026)
+*   **Agenda general** (`/agenda`): vista multi-barbero para admin y recepción.
+*   **API** `GET /api/citas/agenda` con filtros y actualización periódica.
+*   **Tablas:** `barbero_horario_semanal`, `barbero_bloqueos` (vacaciones, días libres).
+*   **Cliente:** `/calendario` para ver disponibilidad propia.
+
+### F. Sistema de notificaciones (2026)
+*   **Motor central:** `lib/notifications/dispatch.ts` — un solo punto para in-app y email.
+*   **Eventos:** reserva nueva/cancelada/reprogramada, venta, cita completada, cambio de horario, asistencia, recordatorios, alertas de sistema.
+*   **Email:** plantillas HTML vía **Resend** (`lib/notifications/templates.ts`).
+*   **In-app:** tabla `notificaciones` (categoría, metadata), campana con Realtime, página `/notificaciones` y tabla `notificacion_preferencias`.
+*   **APIs:** `/api/notificaciones/dispatch`, `recordatorios` (cron), `preferencias`.
+
+### G. Panel administrativo (UX 2026)
+*   KPIs enlazados a módulos, acciones rápidas (agenda, recepción, POS, asistencia).
+*   Sidebar agrupado: Operación / Catálogo / Administración.
+*   Navbar en dashboard: migas de pan (sin duplicar todo el menú lateral).
 
 ---
 
 ## 4. Hitos a Desarrollar (Fases Posteriores)
 
-Para continuar evolucionando la plataforma, se tiene planificado:
-
-1.  **Pasarelas de Pago Integradas (Online):** Conexión directa con procesadores (Stripe/MercadoPago) para que el cliente pague desde su celular al reservar.
-2.  **Notificaciones Omnicanal:** Automatización de recordatorios de citas vía WhatsApp para reducir la tasa de "No Shows" (ausencias).
-3.  **Algoritmo de Descuento Automático:** Aunque el tracking del "Loyalty Circle" (visitas) está activo, se desarrollará la aplicación matemática automática del descuento en la pasarela de pago cuando el cliente alcance la meta (visita 5 o 10).
+1.  **Pasarelas de pago online** (Stripe/MercadoPago) — fuera de alcance actual.
+2.  **WhatsApp** para recordatorios — hoy: email + cron `/api/notificaciones/recordatorios`.
+3.  **Descuento automático Loyalty** en checkout al alcanzar meta de visitas.
+4.  **Fusión de clientes por carnet** con base histórica Excel.
+5.  **UI de reprogramación** de citas (backend `reserva_reprogramada` ya preparado).
 
 ---
 
@@ -55,3 +74,16 @@ Para continuar evolucionando la plataforma, se tiene planificado:
 *   **Frontend:** React con Next.js (App Router), optimizado para SEO y velocidad.
 *   **Styling:** Tailwind CSS (Estética moderna, Premium Dark Mode).
 *   **Base de Datos & Backend:** Supabase (PostgreSQL), brindando fiabilidad bancaria y actualizaciones en tiempo real.
+*   **Correo transaccional:** Resend.
+*   **Repositorio:** [github.com/k3v1bvo/BarberSite](https://github.com/k3v1bvo/BarberSite)
+
+---
+
+## 6. Migraciones SQL
+
+| Archivo | Propósito |
+|---------|-----------|
+| `supabase_PENDIENTE_EJECUTAR.sql` | Asistencia, calendario, índices, trigger `profiles`, config |
+| `supabase_notificaciones.sql` | Categoría/metadata en notificaciones, preferencias usuario |
+
+Estado y checklist: ver **`AVANCE_PROYECTO.md`** en la raíz del repositorio.

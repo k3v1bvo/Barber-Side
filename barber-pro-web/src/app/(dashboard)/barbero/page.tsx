@@ -8,11 +8,12 @@ import { Badge } from '@/components/ui/Badge'
 import { Input } from '@/components/ui/Input'
 import { formatCurrency } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
-import { 
-  DollarSign, Clock, TrendingUp, 
-  Plus, X, Scissors, Calendar, BarChart3
+import {
+  DollarSign, Clock, TrendingUp,
+  Plus, X, Scissors, Calendar, BarChart3, CalendarDays
 } from 'lucide-react'
 import { AsistenciaWidget } from '@/components/ui/AsistenciaWidget'
+import { useToast } from '@/components/ui/Toast'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts'
@@ -33,6 +34,7 @@ interface Cita {
 }
 
 export default function BarberoPage() {
+  const { success, error: toastError } = useToast()
   const [stats, setStats] = useState<Stats>({
     hoy: { citas: 0, completadas: 0, ventas: 0, comision: 0 },
     semana: { citas: 0, ventas: 0, comision: 0 }
@@ -44,6 +46,7 @@ export default function BarberoPage() {
   const [search, setSearch] = useState('')
   const [servicios, setServicios] = useState<{id:string, nombre:string, precio:number}[]>([])
   const [showWalkinModal, setShowWalkinModal] = useState(false)
+  const [userId, setUserId] = useState<string | null>(null)
   const [walkinData, setWalkinData] = useState({
     nombreCliente: '', emailCliente: '', telefonoCliente: '', servicio_id: '', metodo_pago: 'efectivo', propinas: 0
   })
@@ -60,6 +63,8 @@ export default function BarberoPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return router.push('/login')
+
+      setUserId(user.id)
 
       const { data: servs } = await supabase.from('servicios').select('id, nombre, precio').eq('is_active', true)
       if (servs) setServicios(servs)
@@ -202,9 +207,9 @@ export default function BarberoPage() {
       setShowWalkinModal(false)
       setWalkinData({ nombreCliente: '', emailCliente: '', telefonoCliente: '', servicio_id: '', metodo_pago: 'efectivo', propinas: 0 })
       loadData()
-      alert('Venta procesada con éxito')
-    } catch (e: any) {
-      alert('Error: ' + e.message)
+      success('Venta procesada con éxito')
+    } catch (e: unknown) {
+      toastError('Error: ' + (e instanceof Error ? e.message : 'desconocido'))
     } finally {
       setSubmittingWalkin(false)
     }
@@ -229,9 +234,14 @@ export default function BarberoPage() {
           </h1>
           <p className="text-zinc-500 font-medium mt-1">Sigue tu progreso y gestiona tus citas hoy</p>
         </div>
-        <Button onClick={() => setShowWalkinModal(true)} variant="primary" size="lg" className="shadow-lg shadow-amber-500/20 uppercase tracking-wider font-black">
-          <Plus className="w-5 h-5 mr-2" /> Venta Rápida
-        </Button>
+        <div className="flex gap-3">
+          <Button onClick={() => userId && router.push(`/agenda/${userId}`)} variant="outline" size="lg" className="uppercase tracking-wider font-black">
+            <CalendarDays className="w-5 h-5 mr-2" /> Ver Agenda
+          </Button>
+          <Button onClick={() => setShowWalkinModal(true)} variant="primary" size="lg" className="shadow-lg shadow-amber-500/20 uppercase tracking-wider font-black">
+            <Plus className="w-5 h-5 mr-2" /> Venta Rápida
+          </Button>
+        </div>
       </div>
 
       {/* Stats Grid */}
@@ -546,4 +556,4 @@ export default function BarberoPage() {
       )}
     </div>
   )
-}
+}

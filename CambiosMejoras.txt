@@ -1,0 +1,25 @@
+BACKLOG BARBERWEB — Actualizado Mayo 2026
+Ver AVANCE_PROYECTO.md para estado global del proyecto.
+
+[HECHO] 1. Galería / carrusel en página principal con fotos del portafolio.
+[HECHO] 2. Calendarios: agenda general (/agenda), por barbero (/agenda/[id]), vista cliente (/calendario). Mejoras de UX en CalendarView (día/semana según contexto).
+[HECHO] 3. KPIs del admin clicables (ventas, citas, clientes, stock).
+[HECHO] 4. Revisión parcial de botones; panel admin y navegación reorganizados (menos duplicados).
+[HECHO] 5. Búsqueda admin básica: /admin/buscar (clientes y citas).
+[PENDIENTE] 6. Cruce de clientes nuevos/antiguos por número de carnet (importación + merge UI).
+[HECHO] 7. Botones de redes: Facebook, TikTok, WhatsApp (+ Instagram opcional), env y tabla configuracion.
+[HECHO] 8. Registro: flujo de bienvenida y redirección mejorada (register page).
+
+EXTRA IMPLEMENTADO (no estaba en lista original):
+- Sistema completo de asistencia (22:00 auto-cierre, panel admin).
+- Notificaciones unificadas (in-app + Resend + preferencias + /notificaciones).
+- Horarios semanales y bloqueos por barbero.
+- Toasts en lugar de alerts en varios flujos.
+- WhatsApp flotante en landing.
+
+PENDIENTE FUTURO:
+- Pasarelas de pago (Stripe/MercadoPago).
+- Recordatorios WhatsApp.
+- Reprogramación de citas (UI; backend evento listo).
+- Bloqueos integrados en API disponibilidad de slots.
+- Búsqueda global avanzada (más tablas y carnet).

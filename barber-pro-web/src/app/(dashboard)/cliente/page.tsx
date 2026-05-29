@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/Badge'
 import { formatCurrency, cn } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
 import { Calendar, Scissors, History, Clock, User, Star, ArrowRight, XCircle, CheckCircle, ChevronRight, MessageSquare } from 'lucide-react'
+import { useToast } from '@/components/ui/Toast'
 
 interface Cita {
   id: string
@@ -25,6 +26,7 @@ interface UserProfile {
 }
 
 export default function ClientePage() {
+  const { success, error: toastError } = useToast()
   const [citasProximas, setCitasProximas] = useState<Cita[]>([])
   const [citasPasadas, setCitasPasadas] = useState<Cita[]>([])
   const [loading, setLoading] = useState(true)
@@ -93,7 +95,7 @@ export default function ClientePage() {
       if (error) throw error
       loadData()
     } catch (error) {
-      alert('Error al cancelar la cita')
+      toastError('Error al cancelar la cita')
     }
   }
 
@@ -108,10 +110,10 @@ export default function ClientePage() {
           comentario,
         })
       if (error) throw error
-      alert('¡Gracias por tu reseña!')
+      success('¡Gracias por tu reseña!')
       loadData()
     } catch (e: any) {
-      alert('Error enviando reseña: ' + e.message)
+      toastError('Error enviando reseña: ' + (e instanceof Error ? e.message : ''))
     }
   }
 
@@ -301,4 +303,4 @@ export default function ClientePage() {
     </div>
   )
 }
-
+

@@ -3,7 +3,8 @@ import { formatCurrency } from '@/lib/utils'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
-import { Scissors, User } from 'lucide-react'
+import { Scissors, User, CalendarDays } from 'lucide-react'
+import Link from 'next/link'
 import { AsistenciaWidget } from '@/components/ui/AsistenciaWidget'
 import { FiltroAgenda } from '@/components/ui/FiltroAgenda'
 
@@ -83,8 +84,19 @@ export default async function RecepcionPage(props: { searchParams: Promise<{ dat
         <div className="flex flex-col items-end gap-4">
            <FiltroAgenda />
            <div className="flex items-center gap-3">
-             <Button variant="secondary" size="md">Imprimir Reporte</Button>
-             <Button variant="primary" size="md" className="shadow-lg shadow-amber-500/20">Cerrar Caja</Button>
+             <Link href="/agenda">
+               <Button variant="outline" size="md">
+                 <CalendarDays className="w-4 h-4 mr-2" /> Ver Agendas
+               </Button>
+             </Link>
+             <Button variant="secondary" size="md" onClick={() => typeof window !== 'undefined' && window.print()}>
+               Imprimir Reporte
+             </Button>
+             <Link href="/agenda">
+               <Button variant="primary" size="md" className="shadow-lg shadow-amber-500/20">
+                 Agenda general
+               </Button>
+             </Link>
            </div>
         </div>
       </div>
@@ -257,4 +269,4 @@ export default async function RecepcionPage(props: { searchParams: Promise<{ dat
     </div>
   )
 }
-
+

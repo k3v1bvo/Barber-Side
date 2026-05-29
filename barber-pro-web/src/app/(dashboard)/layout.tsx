@@ -22,7 +22,7 @@ export default async function DashboardLayout({
   return (
     <div className="flex min-h-screen bg-zinc-950">
       {/* Sidebar for Desktop */}
-      <Sidebar role={profile?.role} />
+      <Sidebar role={profile?.role} userId={user.id} />
 
       <div className="flex-1 flex flex-col min-w-0">
         {/* Navbar acting as Header & Mobile Nav */}

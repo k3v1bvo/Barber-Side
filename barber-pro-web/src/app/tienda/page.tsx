@@ -7,6 +7,7 @@ import { formatCurrency } from '@/lib/utils'
 import { Button } from '@/components/ui/Button'
 import { ShoppingBag, X, Plus, Minus, Truck, Store, Calendar, CreditCard, Package } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { useToast } from '@/components/ui/Toast'
 
 interface Producto {
   id: string
@@ -31,6 +32,7 @@ interface UserData {
 }
 
 export default function TiendaPage() {
+  const { error: toastError } = useToast()
   const [productos, setProductos] = useState<Producto[]>([])
   const [categorias, setCategorias] = useState<string[]>([])
   const [catActiva, setCatActiva] = useState<string>('Todos')
@@ -140,7 +142,7 @@ export default function TiendaPage() {
       setOrderSuccess(true)
       setCart([])
     } catch (error: any) {
-      alert('Error: ' + error.message)
+      toastError('Error: ' + error.message)
     } finally {
       setSubmitting(false)
     }

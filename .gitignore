@@ -1,0 +1,21 @@
+# Entorno y dependencias
+node_modules/
+barber-pro-web/node_modules/
+barber-pro-web/.next/
+barber-pro-web/out/
+.env
+.env.*
+!.env.example
+barber-pro-web/.env*
+!barber-pro-web/.env.example
+
+# Build / logs
+*.log
+.DS_Store
+.vercel
+*.tsbuildinfo
+
+# Python (scripts)
+__pycache__/
+*.pyc
+.venv/

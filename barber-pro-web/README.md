@@ -1,36 +1,66 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Barber Pro Web (Next.js)
 
-## Getting Started
+Aplicación principal del proyecto **BarberSite**. Vive dentro del monorepo en la raíz del repositorio [BarberSite](https://github.com/k3v1bvo/BarberSite).
 
-First, run the development server:
+## Requisitos
+
+- Node.js 18+
+- Proyecto Supabase configurado
+- (Opcional) Cuenta Resend para correos
+
+## Configuración
 
 ```bash
+npm install
+cp .env.example .env.local
+# Editar .env.local con tus claves
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Variables: ver `.env.example` y [AVANCE_PROYECTO.md](../AVANCE_PROYECTO.md) en la raíz.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Comando | Uso |
+|---------|-----|
+| `npm run dev` | Desarrollo en localhost:3000 |
+| `npm run build` | Build de producción |
+| `npm run start` | Servidor tras build |
+| `npm run lint` | ESLint |
 
-## Learn More
+## Rutas principales
 
-To learn more about Next.js, take a look at the following resources:
+| Ruta | Rol |
+|------|-----|
+| `/` | Landing pública |
+| `/reservar` | Reserva de citas |
+| `/admin` | Panel administrador |
+| `/agenda` | Agenda general |
+| `/agenda/[id]` | Agenda barbero |
+| `/admin/asistencia` | Control de personal |
+| `/notificaciones` | Historial y preferencias |
+| `/recepcion` | Recepción del día |
+| `/barbero` | Panel barbero |
+| `/cliente` | Portal cliente |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## APIs destacadas
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- `POST /api/notificaciones/dispatch` — eventos de notificación
+- `GET /api/citas/agenda` — datos de calendario
+- `POST /api/asistencias/auto-cerrar` — cierre 22:00
 
-## Deploy on Vercel
+## Estructura `src/`
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```
+src/
+├── app/              # App Router (páginas y API routes)
+├── components/       # UI, admin, providers
+├── lib/
+│   ├── notifications/  # dispatch, email, templates
+│   ├── agenda/
+│   ├── asistencia/
+│   └── navigation/
+└── hooks/
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Documentación completa del producto: carpeta raíz del repo (`../README.md`).

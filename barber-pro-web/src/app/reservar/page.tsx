@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/Card'
 import { formatCurrency } from '@/lib/utils'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Calendar, User, Scissors, CheckCircle, ArrowRight, ArrowLeft } from 'lucide-react'
+import { useToast } from '@/components/ui/Toast'
 
 interface Servicio {
   id: string
@@ -40,6 +41,7 @@ export default function ReservarPage() {
 }
 
 function ReservarContent() {
+  const { error: toastError } = useToast()
   const [step, setStep] = useState(1)
   const [servicios, setServicios] = useState<Servicio[]>([])
   const [barberos, setBarberos] = useState<Barbero[]>([])
@@ -233,64 +235,56 @@ function ReservarContent() {
       notasFinales = formData.notas ? `${formData.notas}\n${promoNota}` : promoNota
     }
 
-    // Insertar la cita
-    const { error: citaError } = await supabase.from('citas').insert({
-      cliente_id: clienteId,
-      barbero_id: formData.barbero_id,
-      servicio_id: formData.servicio_id,
-      fecha_hora: fechaHora,
-      precio: precioFinal,
-      duracion_real_minutos: servicio?.duracion_minutos || 30,
-      estado: 'pendiente',
-      notas: notasFinales,
-    })
+    const barbero = barberos.find((b) => b.id === formData.barbero_id)
+
+    const { data: citaNueva, error: citaError } = await supabase
+      .from('citas')
+      .insert({
+        cliente_id: clienteId,
+        barbero_id: formData.barbero_id,
+        servicio_id: formData.servicio_id,
+        fecha_hora: fechaHora,
+        precio: precioFinal,
+        duracion_real_minutos: servicio?.duracion_minutos || 30,
+        estado: 'pendiente',
+        notas: notasFinales,
+      })
+      .select('id')
+      .single()
 
     if (citaError) {
       console.error('Error insertando cita:', citaError)
       throw new Error(citaError.message)
     }
 
-    // Insertar Notificaciones In-App
-    const barbero = barberos.find(b => b.id === formData.barbero_id)
-    await supabase.from('notificaciones').insert([
-      {
-        user_id: formData.barbero_id,
-        titulo: '📅 Nueva Cita Agendada',
-        mensaje: `${formData.nombre} ha reservado para el ${formData.fecha} a las ${formData.hora}.`,
-        tipo: 'info'
-      },
-      {
-        rol_destino: 'admin',
-        titulo: '📅 Nueva Reserva (Sistema)',
-        mensaje: `Nueva cita de ${formData.nombre} con ${barbero?.full_name} (${formData.fecha} ${formData.hora}).`,
-        tipo: 'info'
-      }
-    ])
-
-    // ✅ ENVIAR NOTIFICACIÓN POR EMAIL
     try {
-      await fetch('/api/emails/confirmacion', {
+      await fetch('/api/notificaciones/dispatch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: formData.email,
-          nombreCliente: formData.nombre,
-          servicio: servicio?.nombre,
-          fecha: formData.fecha,
-          hora: formData.hora,
-          nombreBarbero: barbero?.full_name,
-          emailBarbero: barbero?.email
-        })
+          event: 'reserva_nueva',
+          allowPublic: true,
+          payload: {
+            citaId: citaNueva.id,
+            barberoId: formData.barbero_id,
+            barberoNombre: barbero?.full_name,
+            barberoEmail: barbero?.email,
+            clienteNombre: formData.nombre,
+            clienteEmail: formData.email,
+            servicioNombre: servicio?.nombre,
+            fecha: formData.fecha,
+            hora: formData.hora,
+          },
+        }),
       })
     } catch (e) {
-      console.error('Error al disparar el email:', e)
-      // No bloqueamos el éxito de la reserva si falla el email informativo
+      console.error('Error al enviar notificaciones:', e)
     }
 
     setSuccess(true)
   } catch (error: any) {
     console.error('Error completo:', error)
-    alert('Error al reservar: ' + error.message)
+    toastError('Error al reservar: ' + error.message)
   } finally {
     setSubmitting(false)
   }

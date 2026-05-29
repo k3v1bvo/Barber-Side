@@ -3,25 +3,29 @@
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { 
-  LogOut, 
-  User, 
-  Menu, 
-  X, 
-  Users, 
-  LayoutDashboard, 
-  Calendar, 
-  Scissors, 
-  Package, 
+import {
+  LogOut,
+  User,
+  Scissors,
   Home,
-  BarChart3,
   ShoppingBag,
-  Bell,
-  Camera
+  Calendar,
+  MoreHorizontal,
 } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { CampanaNotificaciones } from './CampanaNotificaciones'
+import { DashboardBreadcrumb } from './DashboardBreadcrumb'
+import {
+  getAgendaHref,
+  getAdminNavSections,
+  flattenSections,
+  barberoNavItems,
+  recepcionNavItems,
+  clienteNavItems,
+  isDashboardRoute,
+  isNavItemActive,
+} from '@/lib/navigation/dashboard-nav'
 
 interface UserProfile {
   id: string
@@ -78,26 +82,27 @@ export function Navbar() {
     return name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'U'
   }
 
-  const adminNavItems = [
-    { label: 'Agenda', href: user?.role === 'admin' || user?.role === 'recepcionista' ? '/recepcion' : '/barbero', icon: Calendar },
-    { label: 'Venta', href: '/reservar', icon: ShoppingBag },
-    { label: 'Servicios', href: '/admin/servicios', icon: Scissors },
-    { label: 'Inventario', href: '/admin/productos', icon: Package },
-    { label: 'Usuarios', href: '/admin/usuarios', icon: Users },
-    { label: 'Portafolio', href: '/admin/portafolio', icon: Camera },
-    { label: 'Reportes', href: '/admin/reportes', icon: BarChart3 },
-  ]
+  const agendaHref = getAgendaHref(user?.role, user?.id)
+  const inDashboard = isDashboardRoute(pathname)
 
-  const clienteNavItems = [
-    { label: 'Mis Citas', href: '/cliente', icon: Calendar },
-    { label: 'Reservar', href: '/reservar', icon: Scissors },
-    { label: 'Tienda', href: '/tienda', icon: ShoppingBag },
-    { label: 'Galería', href: '/galeria', icon: Camera },
-  ]
-
-  const navItems = user?.role === 'cliente' ? clienteNavItems : adminNavItems
-
-  const isActive = (href: string) => pathname === href
+  const mobileNavItems = (() => {
+    if (!user) return []
+    if (user.role === 'cliente') return clienteNavItems.slice(0, 4)
+    if (user.role === 'barbero') return barberoNavItems(agendaHref)
+    if (user.role === 'recepcionista') return recepcionNavItems
+    if (user.role === 'admin') {
+      const all = flattenSections(getAdminNavSections(agendaHref))
+      const pick = (href: string) => all.find((i) => i.href === href)
+      return [
+        pick('/admin'),
+        pick(agendaHref),
+        pick('/recepcion'),
+        pick('/reservar'),
+        { label: 'Más', href: '/admin/buscar', icon: MoreHorizontal },
+      ].filter((x): x is NonNullable<typeof x> => Boolean(x))
+    }
+    return recepcionNavItems
+  })()
 
   if (loading) {
     return (
@@ -113,39 +118,34 @@ export function Navbar() {
   return (
     <>
       {/* --- DESKTOP TOP HEADER --- */}
-      <header className="hidden lg:flex h-16 border-b border-white/5 bg-zinc-950/80 backdrop-blur-md items-center justify-between px-8 sticky top-0 z-50">
-        <div className="flex items-center gap-8">
-          <Link href="/" className="flex items-center gap-3 text-amber-500 font-black text-xl tracking-tighter hover:scale-105 transition-transform">
-            <Scissors className="w-6 h-6 glow-amber" />
-            <span>BARBER PRO</span>
-          </Link>
-
-          {/* Nav Links */}
-          <nav className="flex items-center gap-1">
-            {user ? (
-              navItems.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={cn(
-                    "px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2",
-                    isActive(item.href) 
-                      ? "bg-amber-500 text-black shadow-lg shadow-amber-500/20" 
-                      : "text-zinc-400 hover:text-white hover:bg-white/5"
-                  )}
-                >
-                  <item.icon size={16} />
-                  {item.label}
-                </Link>
-              ))
-            ) : (
-              <div className="flex items-center gap-6 text-zinc-400 font-medium">
-                <Link href="/galeria" className="hover:text-amber-400 transition-colors">Galería</Link>
-                <Link href="/tienda" className="hover:text-amber-400 transition-colors">Tienda</Link>
-                <Link href="/reservar" className="hover:text-amber-400 transition-colors">Reservar Cita</Link>
-              </div>
-            )}
-          </nav>
+      <header className="hidden lg:flex h-14 border-b border-white/5 bg-zinc-950/80 backdrop-blur-md items-center justify-between px-6 sticky top-0 z-50">
+        <div className="flex items-center gap-4 min-w-0 flex-1">
+          {user && inDashboard ? (
+            <DashboardBreadcrumb />
+          ) : (
+            <>
+              <Link
+                href="/"
+                className="flex items-center gap-2 text-amber-500 font-black text-lg tracking-tighter hover:scale-105 transition-transform shrink-0"
+              >
+                <Scissors className="w-5 h-5 glow-amber" />
+                <span>BARBER PRO</span>
+              </Link>
+              {!user && (
+                <nav className="flex items-center gap-6 text-zinc-400 font-medium ml-4">
+                  <Link href="/galeria" className="hover:text-amber-400 transition-colors">
+                    Galería
+                  </Link>
+                  <Link href="/tienda" className="hover:text-amber-400 transition-colors">
+                    Tienda
+                  </Link>
+                  <Link href="/reservar" className="hover:text-amber-400 transition-colors">
+                    Reservar
+                  </Link>
+                </nav>
+              )}
+            </>
+          )}
         </div>
 
         <div className="flex items-center gap-4">
@@ -209,17 +209,19 @@ export function Navbar() {
       {/* --- MOBILE BOTTOM NAV (UX Essential) --- */}
       <nav className="lg:hidden fixed bottom-4 left-4 right-4 h-16 bg-zinc-900 border border-white/10 shadow-2xl rounded-2xl flex items-center justify-around z-50 backdrop-blur-lg">
         {user ? (
-          navItems.map((item) => (
-            <Link 
-              key={item.href}
-              href={item.href} 
+          mobileNavItems.map((item) => (
+            <Link
+              key={item.href + item.label}
+              href={item.href}
               className={cn(
-                "flex flex-col items-center justify-center w-14 h-14 rounded-xl transition-all active:scale-90",
-                isActive(item.href) ? "text-amber-500 font-black" : "text-zinc-500"
+                'flex flex-col items-center justify-center min-w-[3rem] px-1 rounded-xl transition-all active:scale-90',
+                isNavItemActive(pathname, item.href) ? 'text-amber-500 font-black' : 'text-zinc-500'
               )}
             >
-              <item.icon size={22} className={cn(isActive(item.href) && "glow-amber")} />
-              <span className="text-[10px] uppercase font-black mt-1 tracking-tighter">{item.label.split('/')[0]}</span>
+              <item.icon size={20} className={cn(isNavItemActive(pathname, item.href) && 'glow-amber')} />
+              <span className="text-[9px] uppercase font-black mt-0.5 tracking-tighter truncate max-w-[4rem]">
+                {item.label}
+              </span>
             </Link>
           ))
         ) : (
@@ -233,4 +235,4 @@ export function Navbar() {
       </nav>
     </>
   )
-}
+}

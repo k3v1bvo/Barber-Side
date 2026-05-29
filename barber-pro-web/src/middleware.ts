@@ -47,21 +47,31 @@ export async function middleware(request: NextRequest) {
   )
 
   const { data: { user } } = await supabase.auth.getUser()
+  const pathname = request.nextUrl.pathname
 
-  // Rutas protegidas
-  const isAdminRoute = request.nextUrl.pathname.startsWith('/admin')
-  const isRecepcionRoute = request.nextUrl.pathname.startsWith('/recepcion')
-  const isBarberoRoute = request.nextUrl.pathname.startsWith('/barbero')
-  const isReservarRoute = request.nextUrl.pathname.startsWith('/reservar')
-  const isLoginPage = request.nextUrl.pathname === '/login'
-  const isRegisterPage = request.nextUrl.pathname === '/register'
+  const isAdminRoute = pathname.startsWith('/admin')
+  const isRecepcionRoute = pathname.startsWith('/recepcion')
+  const isBarberoRoute = pathname.startsWith('/barbero')
+  const isAgendaRoute = pathname.startsWith('/agenda')
+  const isClienteRoute = pathname.startsWith('/cliente')
+  const isCalendarioRoute = pathname.startsWith('/calendario')
+  const isReservarRoute = pathname.startsWith('/reservar')
+  const isLoginPage = pathname === '/login'
+  const isRegisterPage = pathname === '/register'
 
-  // Si no está logueado y trata de acceder a rutas protegidas
-  if (!user && (isAdminRoute || isRecepcionRoute || isBarberoRoute || isReservarRoute)) {
+  const protectedRoutes =
+    isAdminRoute ||
+    isRecepcionRoute ||
+    isBarberoRoute ||
+    isReservarRoute ||
+    isAgendaRoute ||
+    isClienteRoute ||
+    isCalendarioRoute
+
+  if (!user && protectedRoutes) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  // Si ya está logueado y trata de acceder al login/registro
   if (user && (isLoginPage || isRegisterPage)) {
     const { data: profile } = await supabase
       .from('profiles')
@@ -71,10 +81,28 @@ export async function middleware(request: NextRequest) {
 
     if (profile?.role === 'admin') {
       return NextResponse.redirect(new URL('/admin', request.url))
-    } else if (profile?.role === 'recepcionista') {
+    }
+    if (profile?.role === 'recepcionista') {
       return NextResponse.redirect(new URL('/recepcion', request.url))
-    } else if (profile?.role === 'barbero') {
+    }
+    if (profile?.role === 'barbero') {
       return NextResponse.redirect(new URL('/barbero', request.url))
+    }
+    if (profile?.role === 'cliente') {
+      return NextResponse.redirect(new URL('/cliente', request.url))
+    }
+  }
+
+  // Barbero no puede ver agenda general (solo /agenda exacto)
+  if (user && pathname === '/agenda') {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    if (profile?.role === 'barbero') {
+      return NextResponse.redirect(new URL(`/agenda/${user.id}`, request.url))
     }
   }
 
@@ -86,6 +114,9 @@ export const config = {
     '/admin/:path*',
     '/recepcion/:path*',
     '/barbero/:path*',
+    '/agenda/:path*',
+    '/cliente/:path*',
+    '/calendario',
     '/reservar',
     '/login',
     '/register',

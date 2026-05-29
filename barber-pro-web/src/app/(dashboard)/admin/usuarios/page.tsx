@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/Badge'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card'
 import { useRouter } from 'next/navigation'
 import { Plus, Edit, Trash2, Users, ArrowLeft, X, Save } from 'lucide-react'
+import { useToast } from '@/components/ui/Toast'
 
 interface Usuario {
   id: string
@@ -22,6 +23,7 @@ interface Usuario {
 }
 
 export default function UsuariosPage() {
+  const { error: toastError } = useToast()
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
@@ -116,7 +118,7 @@ export default function UsuariosPage() {
       })
       loadUsuarios()
     } catch (error: any) {
-      alert('Error: ' + error.message)
+      toastError('Error: ' + error.message)
     }
   }
 
@@ -130,7 +132,7 @@ export default function UsuariosPage() {
       if (error) throw error
       loadUsuarios()
     } catch (error: any) {
-      alert('Error: ' + error.message)
+      toastError('Error: ' + error.message)
     }
   }
 
@@ -393,4 +395,4 @@ export default function UsuariosPage() {
       )}
     </div>
   )
-}
+}

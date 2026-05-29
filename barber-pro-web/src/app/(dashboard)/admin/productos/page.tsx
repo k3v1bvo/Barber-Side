@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { formatCurrency } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
 import { Plus, Edit, Trash2, Package, AlertTriangle, ArrowLeft, X, Save, Search, Filter } from 'lucide-react'
+import { useToast } from '@/components/ui/Toast'
 
 interface Producto {
   id: string
@@ -24,6 +25,7 @@ interface Producto {
 }
 
 export default function ProductosPage() {
+  const { error: toastError } = useToast()
   const [productos, setProductos] = useState<Producto[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
@@ -114,7 +116,7 @@ export default function ProductosPage() {
       })
       loadProductos()
     } catch (error: any) {
-      alert('Error: ' + error.message)
+      toastError('Error: ' + error.message)
     }
   }
 
@@ -128,7 +130,7 @@ export default function ProductosPage() {
       if (error) throw error
       loadProductos()
     } catch (error: any) {
-      alert('Error: ' + error.message)
+      toastError('Error: ' + error.message)
     }
   }
 
@@ -152,7 +154,7 @@ export default function ProductosPage() {
 
       loadProductos()
     } catch (error: any) {
-      alert('Error: ' + error.message)
+      toastError('Error: ' + error.message)
     }
   }
 
@@ -468,4 +470,4 @@ export default function ProductosPage() {
     </div>
   )
 }
-
+

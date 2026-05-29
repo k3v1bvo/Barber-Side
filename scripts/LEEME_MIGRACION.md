@@ -1,6 +1,8 @@
 # Guía de Migración de Base de Datos (Excel a Supabase)
 
-Esta herramienta automatizada fue diseñada por tu equipo de ingeniería para importar el historial de clientes de tu cliente directamente al nuevo sistema **BarberWeb**, asegurando que conserven sus datos en el "Salón de la Fama" y su nivel en el "Loyalty Circle".
+Esta herramienta automatizada fue diseñada para importar el historial de clientes al sistema **BarberSite / BarberWeb**, asegurando que conserven sus datos en el "Salón de la Fama" y su nivel en el "Loyalty Circle".
+
+Repositorio: [github.com/k3v1bvo/BarberSite](https://github.com/k3v1bvo/BarberSite) · Avance general: [AVANCE_PROYECTO.md](../AVANCE_PROYECTO.md)
 
 ## 1. Preparación del Entorno (Solo la primera vez)
 

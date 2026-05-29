@@ -10,6 +10,7 @@ import { formatCurrency } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
 import { Plus, Edit, Trash2, Scissors, ArrowLeft, X, Save, Clock, Palette } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useToast } from '@/components/ui/Toast'
 
 interface Servicio {
   id: string
@@ -22,6 +23,7 @@ interface Servicio {
 }
 
 export default function ServiciosPage() {
+  const { error: toastError } = useToast()
   const [servicios, setServicios] = useState<Servicio[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
@@ -100,7 +102,7 @@ export default function ServiciosPage() {
       })
       loadServicios()
     } catch (error: any) {
-      alert('Error: ' + error.message)
+      toastError('Error: ' + error.message)
     }
   }
 
@@ -114,7 +116,7 @@ export default function ServiciosPage() {
       if (error) throw error
       loadServicios()
     } catch (error: any) {
-      alert('Error: ' + error.message)
+      toastError('Error: ' + error.message)
     }
   }
 

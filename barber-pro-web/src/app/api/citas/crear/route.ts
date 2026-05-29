@@ -1,4 +1,6 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { getNotificationDbClient } from '@/lib/supabase/admin'
+import { dispatchNotification } from '@/lib/notifications/dispatch'
 import { NextResponse } from 'next/server'
 
 export async function POST(request: Request) {
@@ -60,6 +62,29 @@ export async function POST(request: Request) {
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
+
+    const db = getNotificationDbClient(supabase)
+    const fh = new Date(fecha_hora)
+    const [{ data: cliente }, { data: servicioRow }, { data: barberoRow }] = await Promise.all([
+      supabase.from('clientes').select('nombre, email').eq('id', cliente_id).single(),
+      supabase.from('servicios').select('nombre').eq('id', servicio_id).single(),
+      supabase.from('profiles').select('full_name, email').eq('id', barbero_id).single(),
+    ])
+
+    await dispatchNotification(db, {
+      event: 'reserva_nueva',
+      payload: {
+        citaId: cita.id,
+        barberoId: barbero_id,
+        barberoNombre: barberoRow?.full_name,
+        barberoEmail: barberoRow?.email,
+        clienteNombre: cliente?.nombre,
+        clienteEmail: cliente?.email ?? undefined,
+        servicioNombre: servicioRow?.nombre,
+        fecha: fh.toLocaleDateString('es-BO'),
+        hora: fh.toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit' }),
+      },
+    })
 
     return NextResponse.json({ success: true, data: cita })
   } catch (error) {

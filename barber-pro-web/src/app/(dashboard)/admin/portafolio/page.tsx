@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation'
 import { Plus, Trash2, Camera, ArrowLeft, X, Save, Image as ImageIcon, User, Layers } from 'lucide-react'
 import { Badge } from '@/components/ui/Badge'
 import { cn } from '@/lib/utils'
+import { useToast } from '@/components/ui/Toast'
 
 
 interface PortafolioItem {
@@ -20,6 +21,7 @@ interface PortafolioItem {
 }
 
 export default function AdminPortafolioPage() {
+  const { error: toastError } = useToast()
   const [items, setItems] = useState<PortafolioItem[]>([])
   const [barberos, setBarberos] = useState<{ id: string, full_name: string }[]>([])
   const [loading, setLoading] = useState(true)
@@ -61,7 +63,7 @@ export default function AdminPortafolioPage() {
       setFormData({ image_url: '', categoria: 'Fade', descripcion: '', barbero_id: '' })
       loadData()
     } catch (e: any) {
-      alert('Error: ' + e.message)
+      toastError('Error: ' + (e instanceof Error ? e.message : 'Error'))
     }
   }
 
@@ -71,7 +73,7 @@ export default function AdminPortafolioPage() {
       await supabase.from('portafolio').delete().eq('id', id)
       loadData()
     } catch (e: any) {
-      alert('Error al eliminar')
+      toastError('Error al eliminar')
     }
   }
 

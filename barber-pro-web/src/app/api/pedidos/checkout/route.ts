@@ -1,8 +1,7 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { getNotificationDbClient } from '@/lib/supabase/admin'
+import { dispatchNotification } from '@/lib/notifications/dispatch'
 import { NextResponse } from 'next/server'
-import { Resend } from 'resend'
-
-const resend = new Resend(process.env.RESEND_API_KEY || 're_placeholder_123')
 
 export async function POST(request: Request) {
   const supabase = await createServerSupabaseClient()
@@ -87,42 +86,16 @@ export async function POST(request: Request) {
       }
     }
 
-    // 4. Correos Electrónicos
-    let metodoTxt = ''
-    if (metodo_entrega === 'con_reserva') metodoTxt = 'Recoger en el local (junto con mi cita)'
-    else if (metodo_entrega === 'recoger') metodoTxt = 'Pasar a recoger hoy'
-    else metodoTxt = 'Envío a Domicilio (Pago Cte)'
-
-    // Aviso al Store/Admin
-    await resend.emails.send({
-      from: 'BarberPro Store <onboarding@resend.dev>',
-      to: 'dany3l.11@gmail.com', // FIXME: Debería ser dinámico desde settings, usaré placeholder
-      subject: `🛍️ Nuevo Pedido: ${clienteData.nombre}`,
-      html: `
-        <h1>¡Tienes un nuevo pedido!</h1>
-        <p><strong>Cliente:</strong> ${clienteData.nombre}</p>
-        <p><strong>Teléfono:</strong> ${clienteData.telefono}</p>
-        <p><strong>Método de Entrega:</strong> ${metodoTxt}</p>
-        <p><strong>Total:</strong> $${total.toFixed(2)}</p>
-        <p>Revisa el panel de Pedidos para más detalles.</p>
-      `
+    const db = getNotificationDbClient(supabase)
+    await dispatchNotification(db, {
+      event: 'venta_nueva',
+      payload: {
+        pedidoId: pedidoNuevo.id,
+        clienteNombre: clienteData.nombre,
+        clienteEmail: emailAEnviar,
+        monto: total,
+      },
     })
-
-    // Confirmación al Cliente
-    if (emailAEnviar) {
-      await resend.emails.send({
-        from: 'BarberPro Store <onboarding@resend.dev>',
-        to: emailAEnviar,
-        subject: `Tu pedido está en proceso`,
-        html: `
-          <h1>¡Hola ${clienteData.nombre}!</h1>
-          <p>Hemos recibido tu pedido correctamente.</p>
-          <p><strong>Total:</strong> $${total.toFixed(2)}</p>
-          <p><strong>Método seleccionado:</strong> ${metodoTxt}</p>
-          ${metodo_entrega === 'envio' ? '<p>Nos pondremos en contacto contigo enseguida para coordinar el motorizado. Recuerda que el envío se paga al recibir el producto.</p>' : '<p>Te esperamos en la barbería.</p>'}
-        `
-      })
-    }
 
     return NextResponse.json({ success: true, pedidoId: pedidoNuevo.id })
   } catch (error: any) {
