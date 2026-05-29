@@ -1,25 +1,41 @@
 # Manual de usuario — BarberSite Pro
 
-**Versión del documento:** 1.0 · Mayo 2026  
+**Versión del documento:** 1.1 · Mayo 2026  
 **Sistema:** BarberSite / Barber Pro Web  
 **Desarrollo:** k3v1bvo Studios  
+
+> **Cómo leer este manual:** Los diagramas usan sintaxis Mermaid. En GitHub, GitLab o VS Code con vista previa se ven como gráficos. Si solo ve texto/código, use un visor Markdown compatible o exporte a PDF desde VS Code.
 
 ---
 
 ## Tabla de contenidos
 
-1. [Introducción general](#1-introducción-general)
+**Fundamentos**
+
+1. [Introducción general](#1-introducción-general)  
+   - [Diagramas y mapas del sistema](#16-diagramas-y-mapas-del-sistema)  
+   - [Referencia rápida por rol](#17-referencia-rápida-por-rol)  
 2. [Acceso al sistema](#2-acceso-al-sistema)
-3. [Perfil administrador](#3-perfil-administrador)
-4. [Perfil recepcionista](#4-perfil-recepcionista)
-5. [Perfil barbero](#5-perfil-barbero)
+
+**Por perfil de usuario**
+
+3. [Perfil administrador](#3-perfil-administrador)  
+4. [Perfil recepcionista](#4-perfil-recepcionista)  
+5. [Perfil barbero](#5-perfil-barbero)  
 6. [Perfil cliente](#6-perfil-cliente)
-7. [Sistema de notificaciones](#7-sistema-de-notificaciones)
-8. [Control de asistencia](#8-control-de-asistencia)
+
+**Módulos transversales**
+
+7. [Sistema de notificaciones](#7-sistema-de-notificaciones)  
+8. [Control de asistencia](#8-control-de-asistencia)  
 9. [Sitio público (sin login)](#9-sitio-público-sin-login)
-10. [Recomendaciones y seguridad](#10-recomendaciones-y-seguridad)
-11. [Funciones pendientes o limitadas](#11-funciones-pendientes-o-limitadas)
-12. [Soporte y glosario](#12-soporte-y-glosario)
+
+**Cierre**
+
+10. [Recomendaciones y seguridad](#10-recomendaciones-y-seguridad)  
+11. [Funciones pendientes o limitadas](#11-funciones-pendientes-o-limitadas)  
+12. [Soporte, glosario y FAQ](#12-soporte-glosario-y-faq)  
+13. [Anexo: índice de diagramas](#13-anexo-índice-de-diagramas)
 
 ---
 
@@ -81,6 +97,150 @@ La interfaz utiliza un diseño oscuro profesional (colores **ámbar** y **zinc**
 
 ---
 
+### 1.6 Diagramas y mapas del sistema
+
+#### Arquitectura general (capas)
+
+```mermaid
+flowchart TB
+  subgraph Publico["Sitio público"]
+    HOME["/ Inicio"]
+    GAL["/galeria"]
+    TIE["/tienda"]
+  end
+
+  subgraph Auth["Acceso"]
+    LOG["/login"]
+    REG["/register"]
+  end
+
+  subgraph Dashboard["Paneles por rol"]
+    ADM["/admin"]
+    REC["/recepcion"]
+    BAR["/barbero"]
+    CLI["/cliente"]
+  end
+
+  subgraph Operacion["Operación diaria"]
+    AG["/agenda"]
+    RES["/reservar"]
+    NOT["/notificaciones"]
+    ASI["/admin/asistencia"]
+  end
+
+  subgraph Backend["Servidor y datos"]
+    API["APIs Next.js"]
+    SB[("Supabase\nAuth + PostgreSQL")]
+    EM["Resend\nCorreos"]
+  end
+
+  HOME --> LOG
+  REG --> CLI
+  LOG --> ADM & REC & BAR & CLI
+  ADM & REC --> AG & RES & ASI & NOT
+  BAR --> AG
+  CLI --> RES
+  AG & RES & ASI --> API
+  API --> SB & EM
+```
+
+#### Mapa del sitio (navegación principal)
+
+```mermaid
+mindmap
+  root((BarberSite Pro))
+    Publico
+      Inicio
+      Galeria
+      Tienda
+      Login
+      Registro
+    Cliente
+      Mi panel
+      Reservar
+      Calendario
+      Notificaciones
+    Barbero
+      Panel
+      Mi agenda
+      Asistencia
+    Recepcion
+      Recepcion dia
+      Agenda general
+      POS
+    Admin
+      Panel KPIs
+      Usuarios
+      Servicios
+      Inventario
+      Pedidos
+      Reportes
+      Asistencia global
+```
+
+#### Matriz de permisos (resumen)
+
+| Acción | Cliente | Barbero | Recepción | Admin |
+|--------|:-------:|:-------:|:---------:|:-----:|
+| Reservar cita en línea | ✅ | ✅* | ✅ | ✅ |
+| Ver agenda de todos | ❌ | ❌ | ✅ | ✅ |
+| Ver su propia agenda | ❌ | ✅ | ❌ | ✅ |
+| Marcar asistencia | ❌ | ✅ | ✅ | ❌ |
+| Corregir asistencia | ❌ | ❌ | ❌ | ✅ |
+| Finalizar / cobrar cita | ❌ | ⚠️** | ✅ | ✅ |
+| Crear usuarios staff | ❌ | ❌ | ❌ | ✅ |
+| Inventario y reportes | ❌ | ❌ | ❌ | ✅ |
+| Cancelar propia cita | ✅ | ❌ | ✅ | ✅ |
+
+\* Como cliente o vía POS según flujo.  
+\** Walk-in desde panel barbero.
+
+---
+
+### 1.7 Referencia rápida por rol
+
+#### Tarjeta — Administrador (1 página)
+
+| Paso | Dónde | Acción |
+|------|-------|--------|
+| 1 | `/admin` | Revisar KPIs y alertas |
+| 2 | `/admin/asistencia` | Ver turnos abiertos |
+| 3 | `/agenda` | Supervisar citas del día |
+| 4 | `/recepcion` | Apoyar caja si hace falta |
+| 5 | `/admin/usuarios` | Altas/bajas de personal |
+| 6 | Campana 🔔 | Leer notificaciones |
+
+#### Tarjeta — Recepcionista
+
+| Paso | Dónde | Acción |
+|------|-------|--------|
+| 1 | Widget asistencia | Marcar **entrada** |
+| 2 | `/recepcion` | Lista del día |
+| 3 | Por cada cliente | En proceso → Finalizar |
+| 4 | Walk-in | `/reservar` |
+| 5 | Al cerrar | Marcar **salida** (antes 22:00) |
+
+#### Tarjeta — Barbero
+
+| Paso | Dónde | Acción |
+|------|-------|--------|
+| 1 | Panel `/barbero` | Entrada + ver citas |
+| 2 | `/agenda/[yo]` | Calendario personal |
+| 3 | Durante el día | Atender según agenda |
+| 4 | Campana | Nueva cita asignada |
+| 5 | Salida | Antes de 22:00 |
+
+#### Tarjeta — Cliente
+
+| Paso | Dónde | Acción |
+|------|-------|--------|
+| 1 | `/register` o `/login` | Cuenta |
+| 2 | `/reservar` | Elegir servicio, barbero, hora |
+| 3 | `/cliente` | Ver o cancelar citas |
+| 4 | Correo | Confirmación / recordatorio |
+
+---
+
 ## 2. Acceso al sistema
 
 ### 2.1 URL de acceso
@@ -101,6 +261,41 @@ La interfaz utiliza un diseño oscuro profesional (colores **ámbar** y **zinc**
 
 **Ejemplo:** Un barbero con correo `juan@barberia.com` entra en Login y llega directo a su panel sin buscar manualmente la ruta.
 
+#### Diagrama: inicio de sesión y redirección por rol
+
+```mermaid
+flowchart TD
+  A[Usuario abre /login] --> B{Email y contraseña correctos?}
+  B -->|No| C[Mensaje de error en pantalla]
+  B -->|Sí| D[Leer rol en perfil]
+  D --> E{rol?}
+  E -->|admin| F[/admin]
+  E -->|recepcionista| G[/recepcion]
+  E -->|barbero| H[/barbero]
+  E -->|cliente| I[/cliente]
+  E -->|otro| J[/ inicio]
+```
+
+#### Diagrama: registro de cliente
+
+```mermaid
+sequenceDiagram
+  actor C as Cliente
+  participant Web as BarberSite
+  participant Auth as Supabase Auth
+  participant DB as Base de datos
+
+  C->>Web: Completa /register
+  Web->>Auth: signUp email + password
+  Auth-->>Web: Usuario creado
+  Web->>DB: Insert perfil + cliente
+  alt Sesión inmediata
+    Web-->>C: Bienvenida → /cliente
+  else Confirmar email activo
+    Web-->>C: Revisar correo → luego /login
+  end
+```
+
 ### 2.3 Recuperación de contraseña
 
 > **Importante:** En la versión actual **no hay botón “Olvidé mi contraseña”** en la pantalla de login.
@@ -114,6 +309,20 @@ Opciones disponibles hoy:
 | Confirmación por correo | Si al registrarse Supabase exige confirmar email, el cliente debe abrir el enlace del correo antes de poder entrar (según configuración del proyecto). |
 
 *Mejora futura recomendada:* activar “Reset password” de Supabase Auth y enlazarlo en `/login`.
+
+#### Diagrama: ¿olvidé mi contraseña? (hoy)
+
+```mermaid
+flowchart TD
+  Q[No puedo entrar] --> A{Es cliente o empleado?}
+  A -->|Cliente| B[Contactar barbería por WhatsApp/teléfono]
+  A -->|Empleado| C[Pedir al administrador]
+  B --> D[Admin restablece o crea clave en Usuarios]
+  C --> D
+  D --> E[Probar login de nuevo]
+  Q --> F{Supabase pide confirmar email?}
+  F -->|Sí| G[Abrir enlace del correo primero]
+```
 
 ### 2.4 Cerrar sesión
 
@@ -144,8 +353,40 @@ Al entrar verá:
 
 **Flujo recomendado al abrir el local:**
 
+```mermaid
+flowchart LR
+  A[Login admin] --> B[Panel /admin]
+  B --> C{Hay alertas?}
+  C -->|Sí| D[Resolver stock / turnos / pedidos]
+  C -->|No| E[Agenda o Recepción]
+  D --> E
+  E --> F[Asistencia del equipo]
 ```
-Entrar → Panel Admin → Revisar alertas → Recepción o Agenda → Asistencia del equipo
+
+#### Diagrama: menú administrador
+
+```mermaid
+flowchart TB
+  subgraph OP["Operación"]
+    P[Panel]
+    AG[Agenda]
+    RC[Recepción]
+    POS[Venta POS]
+    AS[Asistencia]
+    NT[Notificaciones]
+  end
+  subgraph CAT["Catálogo"]
+    SV[Servicios]
+    INV[Inventario]
+    PF[Portafolio]
+  end
+  subgraph ADM["Administración"]
+    US[Usuarios]
+    PD[Pedidos]
+    RP[Reportes]
+    BQ[Buscar]
+  end
+  P --> AG & RC & AS
 ```
 
 ### 3.2 Creación de nuevos usuarios (staff)
@@ -166,6 +407,23 @@ Ruta: **Administración → Usuarios** (`/admin/usuarios`)
 3. Guarde.
 
 El sistema crea la cuenta de acceso y el perfil. Entregue al empleado su correo y contraseña temporal; pídale que la cambie en cuanto haya opción de hacerlo (vía soporte técnico hoy).
+
+#### Diagrama: alta de usuario staff (admin)
+
+```mermaid
+sequenceDiagram
+  actor A as Administrador
+  participant U as /admin/usuarios
+  participant Auth as Supabase Auth
+  participant P as profiles
+
+  A->>U: Nuevo usuario + rol + contraseña
+  U->>Auth: Crear cuenta
+  Auth-->>U: user_id
+  U->>P: Actualizar rol, comisión, teléfono
+  U-->>A: Lista actualizada
+  A->>A: Entregar credenciales al empleado
+```
 
 #### Editar usuario existente
 
@@ -230,6 +488,35 @@ Estados de una cita:
 | `en_proceso` | Cliente en sillón |
 | `completado` | Servicio cobrado |
 | `cancelado` | Anulada |
+
+#### Diagrama: ciclo de vida de una cita
+
+```mermaid
+stateDiagram-v2
+  [*] --> pendiente: Reserva creada
+  pendiente --> en_proceso: Recepción inicia servicio
+  pendiente --> cancelado: Cliente o staff cancela
+  en_proceso --> completado: Finalizar + cobro
+  en_proceso --> cancelado: Cancelación excepcional
+  completado --> [*]
+  cancelado --> [*]
+```
+
+#### Diagrama: reserva nueva (cliente o POS)
+
+```mermaid
+flowchart TD
+  S[Inicio reserva] --> L{Usuario logueado?}
+  L -->|No| LOGIN[/login o /register]
+  L -->|Sí| S1[Elegir servicio]
+  LOGIN --> S1
+  S1 --> S2[Elegir barbero]
+  S2 --> S3[Elegir fecha y hora libre]
+  S3 --> S4[Confirmar datos]
+  S4 --> S5[Guardar cita]
+  S5 --> N[Notificaciones: barbero, admin, email]
+  N --> OK[Confirmación en pantalla]
+```
 
 ### 3.5 Recepción y ventas (`/recepcion`)
 
@@ -318,6 +605,36 @@ El recepcionista opera el día a día del salón.
 6. Walk-in sin cita: **Venta / POS** o panel barbero (según procedimiento del local)
 7. Al cerrar local: **Marcar salida** (antes de las 22:00)
 
+#### Diagrama: jornada de recepción (timeline)
+
+```mermaid
+gantt
+  title Ejemplo de jornada — Recepción
+  dateFormat HH:mm
+  axisFormat %H:%M
+  section Apertura
+  Marcar entrada           :a1, 09:00, 15m
+  Revisar citas del día    :a2, after a1, 30m
+  section Operación
+  Atender citas en proceso :a3, 09:45, 11h
+  section Cierre
+  Marcar salida            :a4, 20:30, 15m
+```
+
+#### Diagrama: atención de un cliente en recepción
+
+```mermaid
+flowchart TD
+  L[Llega el cliente] --> H{Tiene cita hoy?}
+  H -->|Sí| B[Buscar en lista /recepcion]
+  H -->|No| W[Walk-in: /reservar]
+  B --> I[Marcar En proceso]
+  I --> S[Servicio en sillón]
+  S --> F[Finalizar: pago + propina]
+  F --> LY[Lealtad actualizada]
+  W --> I
+```
+
 ### 4.3 Agenda y filtros
 
 En **Recepción** puede cambiar a vista **semana** o **mes** para planificar.
@@ -329,6 +646,16 @@ En **Agenda** (`/agenda`) ve el calendario visual multi-barbero.
 ## 5. Perfil barbero
 
 ### 5.1 Panel personal (`/barbero`)
+
+```mermaid
+flowchart LR
+  B[/barbero] --> A[Mi agenda]
+  B --> W[Walk-in]
+  B --> AS[Asistencia]
+  A --> T1[Calendario]
+  A --> T2[Disponibilidad]
+  A --> T3[Horarios y bloqueos]
+```
 
 - Resumen de citas del día
 - Acceso rápido a **Mi agenda**
@@ -408,6 +735,25 @@ Si el administrador técnico activó **“Confirm email”** en Supabase:
 
 > Requiere **iniciar sesión**.
 
+#### Diagrama: experiencia del cliente (viaje completo)
+
+```mermaid
+journey
+  title Viaje del cliente — primera visita
+  section Descubrimiento
+    Ve landing: 5: Cliente
+    Registro: 4: Cliente
+  section Reserva
+    Elige servicio y barbero: 5: Cliente
+    Confirma hora: 5: Cliente
+    Recibe email: 4: Cliente
+  section Visita
+    Asiste a la cita: 5: Cliente
+    Deja testimonio: 4: Cliente
+  section Fidelización
+    Acumula visitas lealtad: 5: Cliente
+```
+
 Pasos:
 
 1. Seleccione **servicio** (precio y duración se muestran)
@@ -483,6 +829,30 @@ Si desactiva una categoría, no recibirá ese tipo de aviso (según canal).
 
 El sistema puede enviar recordatorios de citas en las próximas 24 horas mediante un proceso programado (cron) que llama al endpoint de recordatorios del servidor. Debe configurarlo el técnico en Vercel o un servicio externo.
 
+#### Diagrama: flujo de notificaciones (evento → canales)
+
+```mermaid
+flowchart TB
+  E[Evento del sistema\nreserva, venta, asistencia...] --> D[Motor dispatch]
+  D --> P{Preferencias usuario}
+  P -->|Push activo| APP[(Tabla notificaciones)]
+  P -->|Email activo| MAIL[Resend]
+  APP --> CAMP[Campana en tiempo real]
+  APP --> HIST[/notificaciones]
+  MAIL --> INBOX[Correo del usuario]
+  D --> ROL[Notificación por rol\nadmin / recepción]
+```
+
+#### Diagrama: quién recibe qué (reserva nueva)
+
+```mermaid
+flowchart LR
+  R[Nueva reserva] --> B[Barbero asignado]
+  R --> AD[Admin]
+  R --> RC[Recepción]
+  R --> CL[Cliente email]
+```
+
 ---
 
 ## 8. Control de asistencia
@@ -509,6 +879,40 @@ Queda indicado si el registro fue **editado por administración** o **cerrado au
 
 Entrada después de las **09:15** (configuración actual) puede registrarse como **atrasado** y notificar al admin.
 
+#### Diagrama: línea de tiempo del turno
+
+```mermaid
+flowchart TD
+  subgraph Manana["Jornada laboral"]
+    E[Marcar ENTRADA\nantes 09:15 = presente\n después = atrasado]
+    T[Trabajar / citas]
+    S[Marcar SALIDA\nantes 22:00]
+  end
+  subgraph Noche["Después de 22:00"]
+    AUTO[Sistema cierra turno\nautomáticamente]
+    LOCK[Empleado NO puede marcar salida]
+    ADM[Admin corrige en /admin/asistencia]
+  end
+  E --> T --> S
+  T -->|Olvidó salida| AUTO --> ADM
+  S --> FIN[Turno finalizado]
+  ADM --> FIN
+```
+
+#### Diagrama: estados de asistencia
+
+```mermaid
+stateDiagram-v2
+  [*] --> ausente: Sin entrada
+  ausente --> presente: Entrada a tiempo
+  ausente --> atrasado: Entrada tarde
+  presente --> finalizado: Salida manual
+  atrasado --> finalizado: Salida manual
+  presente --> finalizado: Auto 22:00
+  atrasado --> finalizado: Auto 22:00
+  finalizado --> [*]
+```
+
 ---
 
 ## 9. Sitio público (sin login)
@@ -521,6 +925,19 @@ Entrada después de las **09:15** (configuración actual) puede registrarse como
 | Reservar | Redirige a login si no hay sesión |
 
 Botón flotante de **WhatsApp** (si está configurado en variables de entorno o tabla `configuracion`).
+
+#### Diagrama: recorrido visitante sin cuenta
+
+```mermaid
+flowchart TD
+  V[Visitante en /] --> R{Qué quiere?}
+  R -->|Ver trabajos| G[/galeria]
+  R -->|Comprar| T[/tienda]
+  R -->|Reservar| L{Tiene cuenta?}
+  L -->|No| REG[/register]
+  L -->|Sí| LOG[/login]
+  REG & LOG --> RES[/reservar]
+```
 
 ---
 
@@ -577,7 +994,19 @@ Documentado para evitar confusiones en capacitación:
 
 ---
 
-## 12. Soporte y glosario
+## 12. Soporte, glosario y FAQ
+
+### Preguntas frecuentes (FAQ)
+
+| Pregunta | Respuesta |
+|----------|-----------|
+| ¿Por qué no me deja reservar? | Debe iniciar sesión. Verifique horario disponible del barbero. |
+| ¿No llegó el correo de confirmación? | Revise spam. Verifique Resend en servidor. Confirme email en Supabase si aplica. |
+| ¿Puedo cambiar la hora de mi cita? | Cancele en `/cliente` y reserve de nuevo, o llame a la barbería. |
+| ¿Por qué no puedo marcar salida? | Después de las 22:00 solo el admin puede corregir. |
+| ¿La campana no se actualiza sola? | Active Realtime en Supabase para `notificaciones`. |
+| ¿Cómo creo un barbero nuevo? | Solo admin en `/admin/usuarios`. |
+| ¿Dónde veo ventas del día? | Recepción o admin → Reportes. |
 
 ### Glosario
 
@@ -595,6 +1024,44 @@ Para fallos de acceso, correos que no llegan o despliegue en Vercel: contacte al
 
 ---
 
-**Fin del manual de usuario — BarberSite Pro v1.0**
+## 13. Anexo: índice de diagramas
 
-*Documento alineado con el código desplegado en rama `main` del repositorio BarberSite.*
+| # | Diagrama | Sección |
+|---|----------|---------|
+| 1 | Arquitectura general (capas) | [1.6](#16-diagramas-y-mapas-del-sistema) |
+| 2 | Mapa del sitio (mindmap) | [1.6](#16-diagramas-y-mapas-del-sistema) |
+| 3 | Matriz de permisos | [1.6](#16-diagramas-y-mapas-del-sistema) |
+| 4 | Referencia rápida por rol | [1.7](#17-referencia-rápida-por-rol) |
+| 5 | Login y redirección | [2.2](#22-inicio-de-sesión-todos-los-roles) |
+| 6 | Registro cliente (secuencia) | [2.2](#22-inicio-de-sesión-todos-los-roles) |
+| 7 | Olvidé contraseña | [2.3](#23-recuperación-de-contraseña) |
+| 8 | Rutina admin mañana | [3.1](#31-panel-principal-admin) |
+| 9 | Menú administrador | [3.1](#31-panel-principal-admin) |
+| 10 | Alta usuario staff | [3.2](#32-creación-de-nuevos-usuarios-staff) |
+| 11 | Ciclo de vida de cita | [3.4](#34-gestión-de-reservas-y-calendario-general) |
+| 12 | Flujo reserva nueva | [3.4](#34-gestión-de-reservas-y-calendario-general) |
+| 13 | Jornada recepción (Gantt) | [4.2](#42-flujo-típico-de-un-día) |
+| 14 | Atención cliente recepción | [4.2](#42-flujo-típico-de-un-día) |
+| 15 | Panel barbero | [5.1](#51-panel-personal-barbero) |
+| 16 | Viaje del cliente (journey) | [6.5](#65-reservar-cita-reservar) |
+| 17 | Motor de notificaciones | [7.4](#74-recordatorios-automáticos) |
+| 18 | Destinatarios reserva nueva | [7.4](#74-recordatorios-automáticos) |
+| 19 | Timeline turno asistencia | [8.4](#84-retrasos) |
+| 20 | Estados de asistencia | [8.4](#84-retrasos) |
+| 21 | Visitante sitio público | [9](#9-sitio-público-sin-login) |
+
+### Leyenda visual en calendarios
+
+| Elemento | Significado |
+|----------|-------------|
+| Color por barbero | Cada profesional tiene un color en agenda general |
+| Badge estado | pendiente / en proceso / completado / cancelado |
+| Vista día | Operación hora a hora |
+| Vista semana | Planificación recepción |
+| Vista mes | Visión global |
+
+---
+
+**Fin del manual de usuario — BarberSite Pro v1.1**
+
+*Documento alineado con el código desplegado en rama `main` del repositorio BarberSite. Incluye 21 diagramas de uso y referencias rápidas.*
