@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { useRouter } from 'next/navigation'
-import { Plus, Trash2, ArrowLeft, X, Save, Edit, Eye, EyeOff, Users, Instagram, Globe, GripVertical, RotateCcw, Link, LinkOff } from 'lucide-react'
+import { Plus, Trash2, ArrowLeft, X, Save, Edit, Eye, EyeOff, Users, Instagram, Globe, GripVertical, RotateCcw, Link, Link2Off } from 'lucide-react'
 import { Badge } from '@/components/ui/Badge'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/components/ui/Toast'
@@ -481,7 +481,7 @@ export default function AdminEquipoPage() {
                     <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2">
                       {formData.profile_id
                         ? <Link size={14} className="text-emerald-400" />
-                        : <LinkOff size={14} className="text-zinc-600" />
+                        : <Link2Off size={14} className="text-zinc-600" />
                       }
                     </div>
                   </div>
