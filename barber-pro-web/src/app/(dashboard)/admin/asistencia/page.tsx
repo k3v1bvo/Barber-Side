@@ -55,7 +55,7 @@ export default function AsistenciaAdminPage() {
     const { data } = await supabase
       .from('profiles')
       .select('id, full_name')
-      .in('role', ['barbero', 'recepcionista'])
+      .in('role', ['barbero', 'coordinador'])
       .eq('is_active', true)
     setBarberos(data || [])
   }, [])

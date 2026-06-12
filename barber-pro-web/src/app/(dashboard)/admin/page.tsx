@@ -95,7 +95,7 @@ export default function AdminPage() {
           estado,
           precio,
           clientes (nombre),
-          barberos (full_name),
+          barberos:profiles!barbero_id (full_name),
           servicios (nombre)
         `
           )
@@ -117,7 +117,7 @@ export default function AdminPage() {
 
       setCitasRecientes((citasRecientesData as unknown as Cita[]) || [])
     } catch (error) {
-      console.error('Error cargando datos:', error)
+      console.error('Error cargando datos:', JSON.stringify(error, null, 2), error)
     } finally {
       setLoading(false)
     }

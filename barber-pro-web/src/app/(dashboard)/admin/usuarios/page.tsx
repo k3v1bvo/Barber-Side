@@ -15,6 +15,7 @@ interface Usuario {
   email: string
   full_name: string | null
   phone: string | null
+  ci: string | null
   role: string
   is_active: boolean
   comision_porcentaje: number
@@ -32,7 +33,8 @@ export default function UsuariosPage() {
     email: '',
     full_name: '',
     phone: '',
-    role: 'barbero' as 'barbero' | 'recepcionista' | 'admin',
+    ci: '',
+    role: 'barbero' as 'barbero' | 'coordinador' | 'admin',
     comision_porcentaje: 30,
     avatar_url: '',
     password: '',
@@ -72,6 +74,7 @@ export default function UsuariosPage() {
           .update({
             full_name: formData.full_name,
             phone: formData.phone,
+            ci: formData.ci || null,
             role: formData.role,
             comision_porcentaje: formData.comision_porcentaje,
             avatar_url: formData.avatar_url,
@@ -81,28 +84,28 @@ export default function UsuariosPage() {
 
         if (error) throw error
       } else {
-        const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-          email: formData.email,
-          password: formData.password,
-          email_confirm: true,
-          user_metadata: {
-            full_name: formData.full_name,
+        const response = await fetch('/api/admin/usuarios', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
           },
+          body: JSON.stringify({
+            email: formData.email,
+            password: formData.password,
+            full_name: formData.full_name,
+            phone: formData.phone,
+            ci: formData.ci,
+            role: formData.role,
+            comision_porcentaje: formData.comision_porcentaje,
+            avatar_url: formData.avatar_url
+          })
         })
 
-        if (authError) throw authError
+        const result = await response.json()
 
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .update({
-            role: formData.role,
-            phone: formData.phone,
-            comision_porcentaje: formData.comision_porcentaje,
-            avatar_url: formData.avatar_url,
-          })
-          .eq('id', authData.user.id)
-
-        if (profileError) throw profileError
+        if (!response.ok) {
+          throw new Error(result.error || 'Error al crear usuario')
+        }
       }
 
       setShowModal(false)
@@ -111,6 +114,7 @@ export default function UsuariosPage() {
         email: '',
         full_name: '',
         phone: '',
+        ci: '',
         role: 'barbero',
         comision_porcentaje: 30,
         avatar_url: '',
@@ -139,7 +143,7 @@ export default function UsuariosPage() {
   const getRoleBadge = (role: string) => {
     const variants: Record<string, 'default' | 'success' | 'warning' | 'info'> = {
       admin: 'info',
-      recepcionista: 'warning',
+      coordinador: 'warning',
       barbero: 'success',
     }
     return variants[role] || 'default'
@@ -206,7 +210,7 @@ export default function UsuariosPage() {
                         </div>
                         <div>
                           <p className="font-black text-white group-hover:text-amber-500 transition-colors uppercase tracking-tight">{usuario.full_name || 'Sin nombre'}</p>
-                          <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest">ID: {usuario.id.substring(0,8)}</p>
+                          <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest">{usuario.ci ? `C.I. ${usuario.ci}` : `ID: ${usuario.id.substring(0,8)}`}</p>
                         </div>
                       </div>
                     </td>
@@ -241,6 +245,7 @@ export default function UsuariosPage() {
                               email: usuario.email,
                               full_name: usuario.full_name || '',
                               phone: usuario.phone || '',
+                              ci: usuario.ci || '',
                               role: usuario.role as any,
                               comision_porcentaje: usuario.comision_porcentaje,
                               avatar_url: usuario.avatar_url || '',
@@ -332,9 +337,16 @@ export default function UsuariosPage() {
                   <Input
                     label="Teléfono"
                     type="tel"
-                    placeholder="+54 11 ..."
+                    placeholder="+591 ..."
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    className="bg-zinc-900"
+                  />
+                  <Input
+                    label="C.I. (Cédula)"
+                    placeholder="Ej. 12345678"
+                    value={formData.ci}
+                    onChange={(e) => setFormData({ ...formData, ci: e.target.value })}
                     className="bg-zinc-900"
                   />
                   <div className="space-y-2">
@@ -356,7 +368,7 @@ export default function UsuariosPage() {
                       className="h-12 w-full border border-white/10 bg-zinc-900 rounded-xl px-4 text-sm font-bold text-white focus:border-amber-500/50 outline-none transition-all appearance-none uppercase"
                     >
                       <option value="barbero">Barbero</option>
-                      <option value="recepcionista">Recepcionista</option>
+                      <option value="coordinador">Coordinador/a</option>
                       <option value="admin">Administrador</option>
                     </select>
                   </div>

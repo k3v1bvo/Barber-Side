@@ -8,18 +8,24 @@ import { es } from 'date-fns/locale'
 import { X } from 'lucide-react'
 import type { AgendaCita } from '@/lib/agenda/types'
 import Link from 'next/link'
+import { useState } from 'react'
+import { useToast } from './Toast'
 
 interface CitaDetailModalProps {
   cita: AgendaCita | null
   onClose: () => void
   showBarbero?: boolean
+  onUpdate?: () => void
 }
 
-export function CitaDetailModal({ cita, onClose, showBarbero = true }: CitaDetailModalProps) {
+export function CitaDetailModal({ cita, onClose, showBarbero = true, onUpdate }: CitaDetailModalProps) {
+  const [verifying, setVerifying] = useState(false)
+  const { success, error } = useToast()
   if (!cita) return null
 
   const estadoVariant: Record<string, 'default' | 'success' | 'warning' | 'danger' | 'info'> = {
     pendiente: 'warning',
+    pendiente_pago: 'warning',
     confirmado: 'info',
     en_proceso: 'info',
     completado: 'success',
@@ -80,6 +86,12 @@ export function CitaDetailModal({ cita, onClose, showBarbero = true }: CitaDetai
             <span className="text-zinc-500 font-bold uppercase text-[10px] tracking-widest">Precio</span>
             <span className="text-white font-black">{formatCurrency(cita.precio)}</span>
           </div>
+          {cita.anticipo_monto !== undefined && cita.anticipo_monto > 0 && (
+            <div className="flex justify-between gap-4">
+              <span className="text-zinc-500 font-bold uppercase text-[10px] tracking-widest">Anticipo Pagado</span>
+              <span className="text-amber-400 font-black">{formatCurrency(cita.anticipo_monto)}</span>
+            </div>
+          )}
           <div className="flex justify-between gap-4">
             <span className="text-zinc-500 font-bold uppercase text-[10px] tracking-widest">Duración</span>
             <span className="text-white font-bold">{cita.duracion_minutos} min</span>
@@ -87,11 +99,41 @@ export function CitaDetailModal({ cita, onClose, showBarbero = true }: CitaDetai
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3 pt-2">
-          <Link href="/recepcion" className="flex-1">
-            <Button variant="primary" size="md" className="w-full font-black uppercase tracking-wider">
-              Ir a recepción
-            </Button>
-          </Link>
+          {cita.estado === 'pendiente_pago' ? (
+             <Button 
+               variant="warning" 
+               size="md" 
+               className="flex-1 font-black uppercase tracking-wider"
+               disabled={verifying}
+               onClick={async () => {
+                 setVerifying(true)
+                 try {
+                   const res = await fetch('/api/citas/verificar-pago', {
+                     method: 'POST',
+                     headers: { 'Content-Type': 'application/json' },
+                     body: JSON.stringify({ citaId: cita.id })
+                   })
+                   if (!res.ok) throw new Error('Error al verificar')
+                   success('Pago verificado')
+                   if (onUpdate) onUpdate()
+                   else window.location.reload()
+                   onClose()
+                 } catch (e) {
+                   error('No se pudo verificar el pago')
+                 } finally {
+                   setVerifying(false)
+                 }
+               }}
+             >
+               {verifying ? 'Verificando...' : '✅ Verificar Pago'}
+             </Button>
+          ) : (
+            <Link href="/coordinador" className="flex-1">
+              <Button variant="primary" size="md" className="w-full font-black uppercase tracking-wider">
+                Ir a coordinación
+              </Button>
+            </Link>
+          )}
           <Button variant="outline" size="md" className="flex-1" onClick={onClose}>
             Cerrar
           </Button>

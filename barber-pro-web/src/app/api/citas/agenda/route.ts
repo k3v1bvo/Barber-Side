@@ -37,10 +37,10 @@ export async function GET(request: NextRequest) {
       new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 
     const isAdmin = role === 'admin'
-    const isRecepcionista = role === 'recepcionista'
+    const isCoordinador = role === 'coordinador'
     const isBarbero = role === 'barbero'
 
-    if (!isAdmin && !isRecepcionista && !isBarbero && !isCliente) {
+    if (!isAdmin && !isCoordinador && !isBarbero && !isCliente) {
       return NextResponse.json({ error: 'No tienes permisos' }, { status: 403 })
     }
 
@@ -62,6 +62,7 @@ export async function GET(request: NextRequest) {
         duracion_real_minutos,
         estado,
         precio,
+        anticipo_monto,
         barbero_id,
         clientes (nombre),
         servicios (nombre, duracion_minutos),
@@ -96,6 +97,7 @@ export async function GET(request: NextRequest) {
         cliente_nombre: pickName(cita.clientes, 'Cliente'),
         servicio_nombre: pickName(cita.servicios, 'Servicio'),
         precio: cita.precio,
+        anticipo_monto: cita.anticipo_monto,
         barbero_id: cita.barbero_id,
         barbero_nombre: pickName(cita.barberos, 'Barbero'),
       }

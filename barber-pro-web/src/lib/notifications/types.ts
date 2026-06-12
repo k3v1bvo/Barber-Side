@@ -8,6 +8,8 @@ export type NotificationCategory =
   | 'asistencia'
   | 'recordatorio'
   | 'sistema'
+  | 'pago_pendiente'
+  | 'pago_verificado'
 
 export type NotificationTipo = 'info' | 'success' | 'warning' | 'danger'
 

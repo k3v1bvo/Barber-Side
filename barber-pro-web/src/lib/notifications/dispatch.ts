@@ -116,12 +116,12 @@ export async function dispatchNotification(
           metadata: meta,
         })
 
-        await notifyRole(db, 'recepcionista', {
+        await notifyRole(db, 'coordinador', {
           titulo: '📅 Nueva reserva',
           mensaje: msg,
           tipo: 'info',
           categoria: event,
-          link: '/recepcion',
+          link: '/coordinador',
           metadata: meta,
         })
 
@@ -249,7 +249,7 @@ export async function dispatchNotification(
           link: '/admin/pedidos',
           metadata: { pedido_id: p.pedidoId },
         })
-        await notifyRole(db, 'recepcionista', {
+        await notifyRole(db, 'coordinador', {
           titulo: '🛍️ Nuevo pedido',
           mensaje: `${p.clienteNombre} · ${monto}`,
           tipo: 'info',
@@ -339,6 +339,124 @@ export async function dispatchNotification(
           link: p.link || '/admin',
         })
         await sendAdminEmail('alerta_sistema', { motivo: p.motivo })
+        break
+      }
+
+      case 'pago_pendiente': {
+        const anticipo = p.monto != null ? `Bs ${Number(p.monto).toFixed(2)}` : '—'
+        const msg = `💰 ${p.clienteNombre || 'Cliente'} pagó anticipo QR (${anticipo}) — ${p.servicioNombre || 'Servicio'} · ${p.fecha} ${p.hora}`
+        const meta = { cita_id: p.citaId, barbero_id: p.barberoId }
+
+        // Notificar al barbero asignado
+        if (p.barberoId) {
+          await notifyUser(
+            db,
+            p.barberoId,
+            event,
+            {
+              titulo: '💰 Pago QR por verificar',
+              mensaje: msg,
+              tipo: 'warning',
+              categoria: event,
+              link: '/barbero',
+              metadata: meta,
+            },
+            p.barberoEmail
+              ? {
+                  to: p.barberoEmail,
+                  template: 'pago_pendiente_equipo',
+                  data: {
+                    nombre: p.clienteNombre,
+                    servicio: p.servicioNombre,
+                    anticipo,
+                    fecha: p.fecha,
+                    hora: p.hora,
+                  },
+                }
+              : undefined
+          )
+        }
+
+        // Notificar al admin
+        await notifyRole(db, 'admin', {
+          titulo: '💰 Anticipo QR pendiente',
+          mensaje: msg + (p.barberoNombre ? ` · Barbero: ${p.barberoNombre}` : ''),
+          tipo: 'warning',
+          categoria: event,
+          link: '/admin',
+          metadata: meta,
+        })
+
+        // Notificar al coordinador
+        await notifyRole(db, 'coordinador', {
+          titulo: '💰 Anticipo QR pendiente',
+          mensaje: msg,
+          tipo: 'warning',
+          categoria: event,
+          link: '/coordinador',
+          metadata: meta,
+        })
+
+        // Email al admin
+        await sendAdminEmail('pago_pendiente_equipo', {
+          nombre: p.clienteNombre,
+          servicio: p.servicioNombre,
+          anticipo,
+          fecha: p.fecha,
+          hora: p.hora,
+        })
+        break
+      }
+
+      case 'pago_verificado': {
+        const anticipo = p.monto != null ? `Bs ${Number(p.monto).toFixed(2)}` : '—'
+        const verificador = p.motivo || 'Equipo' // usamos motivo para pasar el nombre del verificador
+        const msg = `✅ Pago verificado por ${verificador} — ${p.clienteNombre || 'Cliente'} · ${anticipo}`
+        const meta = { cita_id: p.citaId }
+
+        // Notificar al admin
+        await notifyRole(db, 'admin', {
+          titulo: '✅ Reserva confirmada + pago verificado',
+          mensaje: msg,
+          tipo: 'success',
+          categoria: event,
+          link: '/admin',
+          metadata: meta,
+        })
+
+        // Notificar al barbero (si no fue él quien verificó)
+        if (p.barberoId) {
+          await notifyUser(db, p.barberoId, event, {
+            titulo: '✅ Pago verificado',
+            mensaje: `Cita confirmada con ${p.clienteNombre} — ${anticipo} anticipo verificado`,
+            tipo: 'success',
+            categoria: event,
+            link: '/barbero',
+            metadata: meta,
+          })
+        }
+
+        // Email al cliente
+        if (p.clienteEmail) {
+          await sendNotificationEmail(p.clienteEmail, 'pago_verificado_cliente', {
+            nombre: p.clienteNombre,
+            servicio: p.servicioNombre,
+            anticipo,
+            fecha: p.fecha,
+            hora: p.hora,
+            barbero: p.barberoNombre,
+          })
+        }
+
+        // Email al admin
+        await sendAdminEmail('pago_verificado_admin', {
+          nombre: p.clienteNombre,
+          servicio: p.servicioNombre,
+          anticipo,
+          fecha: p.fecha,
+          hora: p.hora,
+          verificadoPor: verificador,
+        })
         break
       }
 

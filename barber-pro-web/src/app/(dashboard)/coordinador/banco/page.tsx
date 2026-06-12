@@ -1,0 +1,167 @@
+'use client'
+
+import { useEffect, useState, useCallback } from 'react'
+import { Card, CardContent } from '@/components/ui/Card'
+import { Button } from '@/components/ui/Button'
+import { formatCurrency } from '@/lib/utils'
+import { Landmark, Plus, X } from 'lucide-react'
+
+interface Transaction {
+  id: string; fecha: string; ci: string; nombre: string
+  glosa: string; costo: number; tipo_movimiento: string; creado_en: string
+}
+
+export default function BancoPage() {
+  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showForm, setShowForm] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  const [form, setForm] = useState({
+    ci: '', nombre: '', glosa: '', costo: '',
+    tipo_movimiento: 'DEPOSITO',
+  })
+
+  const loadData = useCallback(async () => {
+    const res = await fetch('/api/transactions?libro=BANCO&limit=50')
+    if (res.ok) setTransactions(await res.json())
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { loadData() }, [loadData])
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSaving(true)
+    const res = await fetch('/api/transactions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        libro: 'BANCO',
+        ci: form.ci, nombre: form.nombre,
+        cuenta_codigo: '1.1.1.4.1',
+        cuenta_detalle: 'Caja de ahorro M.N. BANCO GANADERO',
+        glosa: form.glosa,
+        costo: parseFloat(form.costo),
+        tipo_movimiento: form.tipo_movimiento,
+        metodo_pago: 'qr',
+      }),
+    })
+    if (res.ok) {
+      setShowForm(false)
+      setForm({ ci: '', nombre: '', glosa: '', costo: '', tipo_movimiento: 'DEPOSITO' })
+      loadData()
+    }
+    setSaving(false)
+  }
+
+  const totalBalance = transactions.reduce((s, t) => {
+    return t.tipo_movimiento === 'RETIRO' ? s - Number(t.costo) : s + Number(t.costo)
+  }, 0)
+
+  if (loading) {
+    return <div className="flex items-center justify-center h-96"><div className="w-12 h-12 border-4 border-zinc-700 border-t-blue-500 rounded-full animate-spin" /></div>
+  }
+
+  return (
+    <div className="space-y-8 animate-in fade-in duration-500 pb-20 lg:pb-0">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b border-white/5 pb-6">
+        <div>
+          <h1 className="text-4xl font-black tracking-tight text-white uppercase">
+            Libro de <span className="text-blue-500">Banco</span>
+          </h1>
+          <p className="text-zinc-500 font-medium mt-1">Depósitos y retiros — Banco Ganadero</p>
+        </div>
+        <div className="flex items-center gap-4">
+          <Card className="border-white/5 bg-zinc-900/80">
+            <CardContent className="px-4 py-3 flex items-center gap-3">
+              <Landmark className="w-5 h-5 text-blue-500" />
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Saldo</p>
+                <p className={`text-lg font-black ${totalBalance >= 0 ? 'text-blue-400' : 'text-red-400'}`}>{formatCurrency(totalBalance)}</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Button variant="primary" onClick={() => setShowForm(!showForm)} className="gap-2 font-black uppercase tracking-wider">
+            {showForm ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+            {showForm ? 'Cerrar' : 'Nuevo'}
+          </Button>
+        </div>
+      </div>
+
+      {showForm && (
+        <Card className="border-blue-500/30 bg-zinc-900/80 animate-in slide-in-from-top-2 duration-300">
+          <CardContent className="p-6">
+            <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-1 block">Tipo</label>
+                <select value={form.tipo_movimiento} onChange={(e) => setForm({ ...form, tipo_movimiento: e.target.value })} className="w-full h-11 bg-zinc-950 border border-white/10 rounded-xl px-4 text-sm text-white focus:border-blue-500/50 outline-none appearance-none">
+                  <option value="DEPOSITO">Depósito</option>
+                  <option value="RETIRO">Retiro</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-1 block">C.I.</label>
+                <input value={form.ci} onChange={(e) => setForm({ ...form, ci: e.target.value })} className="w-full h-11 bg-zinc-950 border border-white/10 rounded-xl px-4 text-sm text-white focus:border-blue-500/50 outline-none" required />
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-1 block">Nombre</label>
+                <input value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} className="w-full h-11 bg-zinc-950 border border-white/10 rounded-xl px-4 text-sm text-white focus:border-blue-500/50 outline-none" required />
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-1 block">Glosa</label>
+                <input value={form.glosa} onChange={(e) => setForm({ ...form, glosa: e.target.value })} className="w-full h-11 bg-zinc-950 border border-white/10 rounded-xl px-4 text-sm text-white focus:border-blue-500/50 outline-none" required />
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-1 block">Monto (Bs)</label>
+                <input type="number" step="0.01" min="0" value={form.costo} onChange={(e) => setForm({ ...form, costo: e.target.value })} className="w-full h-11 bg-zinc-950 border border-white/10 rounded-xl px-4 text-sm text-white focus:border-blue-500/50 outline-none" required />
+              </div>
+              <div className="flex items-end">
+                <Button type="submit" variant="primary" disabled={saving} className="w-full font-black uppercase tracking-wider">{saving ? 'Guardando...' : 'Registrar'}</Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card className="border-white/5 bg-zinc-900/50 overflow-hidden">
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-white/10 text-left">
+                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-zinc-500">Fecha</th>
+                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-zinc-500">Tipo</th>
+                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-zinc-500">Nombre</th>
+                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-zinc-500">Glosa</th>
+                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-zinc-500 text-right">Monto</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {transactions.length === 0 ? (
+                  <tr><td colSpan={5} className="px-4 py-12 text-center text-zinc-600">No hay movimientos bancarios</td></tr>
+                ) : (
+                  transactions.map((tx) => (
+                    <tr key={tx.id} className="hover:bg-white/[0.02] transition-colors">
+                      <td className="px-4 py-3 text-zinc-400 whitespace-nowrap">{tx.fecha}</td>
+                      <td className="px-4 py-3">
+                        <span className={`text-xs font-black uppercase ${tx.tipo_movimiento === 'RETIRO' ? 'text-red-400' : 'text-blue-400'}`}>
+                          {tx.tipo_movimiento}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-white font-bold">{tx.nombre}</td>
+                      <td className="px-4 py-3 text-zinc-300">{tx.glosa}</td>
+                      <td className={`px-4 py-3 text-right font-black ${tx.tipo_movimiento === 'RETIRO' ? 'text-red-400' : 'text-blue-400'}`}>
+                        {tx.tipo_movimiento === 'RETIRO' ? '-' : '+'}{formatCurrency(tx.costo)}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}

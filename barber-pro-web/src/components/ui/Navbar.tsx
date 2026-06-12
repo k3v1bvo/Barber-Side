@@ -11,17 +11,19 @@ import {
   ShoppingBag,
   Calendar,
   MoreHorizontal,
+  Menu,
 } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { CampanaNotificaciones } from './CampanaNotificaciones'
 import { DashboardBreadcrumb } from './DashboardBreadcrumb'
+import { useSidebar } from '@/components/providers/SidebarProvider'
 import {
   getAgendaHref,
   getAdminNavSections,
+  getCoordinadorNavSections,
   flattenSections,
   barberoNavItems,
-  recepcionNavItems,
   clienteNavItems,
   isDashboardRoute,
   isNavItemActive,
@@ -42,6 +44,7 @@ export function Navbar() {
   const router = useRouter()
   const pathname = usePathname()
   const supabase = createClient()
+  const { toggleMobile } = useSidebar()
 
   useEffect(() => {
     const getUser = async () => {
@@ -71,7 +74,7 @@ export function Navbar() {
   const getRoleLabel = (role: string) => {
     const roles: Record<string, string> = {
       admin: 'Administrador',
-      recepcionista: 'Recepción',
+      coordinador: 'Coordinación',
       barbero: 'Barbero',
       cliente: 'Cliente'
     }
@@ -87,26 +90,36 @@ export function Navbar() {
 
   const mobileNavItems = (() => {
     if (!user) return []
-    if (user.role === 'cliente') return clienteNavItems.slice(0, 4)
+    if (user.role === 'cliente') return clienteNavItems
     if (user.role === 'barbero') return barberoNavItems(agendaHref)
-    if (user.role === 'recepcionista') return recepcionNavItems
+    if (user.role === 'coordinador') {
+      const all = flattenSections(getCoordinadorNavSections(agendaHref))
+      const pick = (href: string) => all.find((i) => i.href === href)
+      return [
+        pick('/coordinador'),
+        pick(agendaHref),
+        pick('/reservar'),
+        pick('/coordinador/arqueo'),
+        { label: 'Más', href: '/coordinador/caja-chica', icon: MoreHorizontal },
+      ].filter((x): x is NonNullable<typeof x> => Boolean(x))
+    }
     if (user.role === 'admin') {
       const all = flattenSections(getAdminNavSections(agendaHref))
       const pick = (href: string) => all.find((i) => i.href === href)
       return [
         pick('/admin'),
         pick(agendaHref),
-        pick('/recepcion'),
         pick('/reservar'),
+        pick('/coordinador/arqueo'),
         { label: 'Más', href: '/admin/buscar', icon: MoreHorizontal },
       ].filter((x): x is NonNullable<typeof x> => Boolean(x))
     }
-    return recepcionNavItems
+    return clienteNavItems
   })()
 
   if (loading) {
     return (
-      <header className="h-16 border-b border-white/5 bg-zinc-950/80 backdrop-blur-md flex items-center px-6 sticky top-0 z-50">
+      <header className="h-16 border-b border-white/5 bg-zinc-950/80 backdrop-blur-md flex items-center px-6 sticky top-0 z-40">
          <div className="flex items-center gap-3 text-amber-500 font-black tracking-tighter animate-pulse">
             <Scissors className="w-6 h-6" />
             <span>BARBER PRO</span>
@@ -118,7 +131,7 @@ export function Navbar() {
   return (
     <>
       {/* --- DESKTOP TOP HEADER --- */}
-      <header className="hidden lg:flex h-14 border-b border-white/5 bg-zinc-950/80 backdrop-blur-md items-center justify-between px-6 sticky top-0 z-50">
+      <header className="hidden lg:flex h-14 border-b border-white/5 bg-zinc-950/80 backdrop-blur-md items-center justify-between px-6 sticky top-0 z-40">
         <div className="flex items-center gap-4 min-w-0 flex-1">
           {user && inDashboard ? (
             <DashboardBreadcrumb />
@@ -194,11 +207,24 @@ export function Navbar() {
       </header>
 
       {/* --- MOBILE TOP BAR --- */}
-      <header className="lg:hidden h-16 border-b border-white/5 bg-zinc-950/80 backdrop-blur-md flex items-center justify-between px-6 sticky top-0 z-50">
-        <Link href="/" className="flex items-center gap-3 text-amber-500 font-black tracking-tighter">
-          <Scissors className="w-6 h-6 glow-amber" />
-          <span>BARBER PRO</span>
-        </Link>
+      <header className="lg:hidden h-16 border-b border-white/5 bg-zinc-950/80 backdrop-blur-md flex items-center justify-between px-4 sticky top-0 z-40">
+        {/* Hamburger + Logo */}
+        <div className="flex items-center gap-3">
+          {user && inDashboard && (
+            <button
+              onClick={toggleMobile}
+              className="w-10 h-10 flex items-center justify-center rounded-xl bg-zinc-900 border border-white/10 text-zinc-300 hover:text-amber-400 hover:border-amber-500/30 transition-all active:scale-90"
+              aria-label="Abrir menú"
+            >
+              <Menu size={20} />
+            </button>
+          )}
+          <Link href="/" className="flex items-center gap-2 text-amber-500 font-black tracking-tighter">
+            <Scissors className="w-6 h-6 glow-amber" />
+            <span>BARBER PRO</span>
+          </Link>
+        </div>
+
         {user ? (
            <CampanaNotificaciones userId={user.id || ''} userRole={user.role} />
         ) : (

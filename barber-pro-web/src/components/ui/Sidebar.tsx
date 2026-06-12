@@ -1,61 +1,144 @@
 'use client'
 
+import { useEffect, useRef } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import { usePathname } from 'next/navigation'
-import { Scissors, Home } from 'lucide-react'
+import {
+  Scissors,
+  Home,
+  ChevronLeft,
+  ChevronRight,
+  X,
+} from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
+import { useSidebar } from '@/components/providers/SidebarProvider'
 import {
   getAgendaHref,
   getAdminNavSections,
+  getCoordinadorNavSections,
   barberoNavItems,
-  recepcionNavItems,
   clienteNavItems,
   isNavItemActive,
   type NavSection,
 } from '@/lib/navigation/dashboard-nav'
 
+/* ——————————————————————————————————————————————
+   Types
+   —————————————————————————————————————————————— */
 interface SidebarProps {
   role?: string
   userId?: string
 }
 
+/* ——————————————————————————————————————————————
+   Tooltip wrapper (visible only when collapsed)
+   —————————————————————————————————————————————— */
+function Tooltip({
+  label,
+  children,
+  show,
+}: {
+  label: string
+  children: React.ReactNode
+  show: boolean
+}) {
+  return (
+    <div className="sidebar-tooltip-wrapper group/tip relative">
+      {children}
+      {show && (
+        <span className="sidebar-tooltip">
+          {label}
+        </span>
+      )}
+    </div>
+  )
+}
+
+/* ——————————————————————————————————————————————
+   Nav Link (supports collapsed icon-only mode)
+   —————————————————————————————————————————————— */
 function NavLink({
   href,
   label,
   icon: Icon,
   active,
+  collapsed,
 }: {
   href: string
   label: string
   icon: LucideIcon
   active: boolean
+  collapsed: boolean
 }) {
-  return (
+  const { closeMobile } = useSidebar()
+
+  const link = (
     <Link
       href={href}
+      onClick={closeMobile}
       className={cn(
-        'flex items-center gap-3 px-4 py-2.5 rounded-xl font-bold transition-all duration-200 btn-press',
+        'sidebar-nav-link group/link',
+        collapsed && 'sidebar-nav-link--collapsed',
         active
-          ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20'
-          : 'text-zinc-400 hover:text-white hover:bg-white/5'
+          ? 'sidebar-nav-link--active'
+          : 'sidebar-nav-link--inactive'
       )}
     >
-      <Icon size={18} className={cn(active ? 'text-black' : 'text-amber-500/70')} />
-      <span className="text-sm">{label}</span>
+      <Icon
+        size={collapsed ? 20 : 18}
+        className={cn(
+          'shrink-0 transition-all duration-200',
+          active ? 'text-black' : 'text-amber-500/70 group-hover/link:text-amber-400'
+        )}
+      />
+      {!collapsed && (
+        <span className="text-sm whitespace-nowrap overflow-hidden sidebar-label">
+          {label}
+        </span>
+      )}
     </Link>
+  )
+
+  if (collapsed) {
+    return <Tooltip label={label} show>{link}</Tooltip>
+  }
+
+  return link
+}
+
+/* ——————————————————————————————————————————————
+   Section heading (hidden when collapsed)
+   —————————————————————————————————————————————— */
+function SectionTitle({ title, collapsed }: { title: string; collapsed: boolean }) {
+  if (collapsed) {
+    return <div className="sidebar-section-divider" />
+  }
+  return (
+    <p className="px-4 text-[10px] uppercase font-black text-zinc-600 tracking-[0.2em] mb-2 sidebar-label">
+      {title}
+    </p>
   )
 }
 
-function NavSections({ sections, pathname }: { sections: NavSection[]; pathname: string }) {
+/* ——————————————————————————————————————————————
+   Nav sections renderer
+   —————————————————————————————————————————————— */
+function NavSections({
+  sections,
+  pathname,
+  collapsed,
+}: {
+  sections: NavSection[]
+  pathname: string
+  collapsed: boolean
+}) {
   return (
     <>
       {sections.map((section) => (
-        <div key={section.title} className="mb-6">
-          <p className="px-4 text-[10px] uppercase font-black text-zinc-600 tracking-[0.2em] mb-2">
-            {section.title}
-          </p>
-          <div className="space-y-0.5">
+        <div key={section.title} className={cn('mb-4', collapsed && 'mb-2')}>
+          <SectionTitle title={section.title} collapsed={collapsed} />
+          <div className={cn('space-y-0.5', collapsed && 'space-y-1')}>
             {section.items.map((item) => (
               <NavLink
                 key={item.href + item.label}
@@ -63,6 +146,7 @@ function NavSections({ sections, pathname }: { sections: NavSection[]; pathname:
                 label={item.label}
                 icon={item.icon}
                 active={isNavItemActive(pathname, item.href)}
+                collapsed={collapsed}
               />
             ))}
           </div>
@@ -72,8 +156,46 @@ function NavSections({ sections, pathname }: { sections: NavSection[]; pathname:
   )
 }
 
+/* ——————————————————————————————————————————————
+   Flat items renderer (for non-admin roles)
+   —————————————————————————————————————————————— */
+function FlatNavItems({
+  items,
+  pathname,
+  collapsed,
+  agendaHref,
+}: {
+  items: { href: string; label: string; icon: LucideIcon }[]
+  pathname: string
+  collapsed: boolean
+  agendaHref?: string
+}) {
+  return (
+    <div className={cn('space-y-0.5', collapsed && 'space-y-1')}>
+      {items.map((item) => {
+        const href = agendaHref && item.href === '/agenda' ? agendaHref : item.href
+        return (
+          <NavLink
+            key={href + item.label}
+            href={href}
+            label={item.label}
+            icon={item.icon}
+            active={isNavItemActive(pathname, href)}
+            collapsed={collapsed}
+          />
+        )
+      })}
+    </div>
+  )
+}
+
+/* ——————————————————————————————————————————————
+   MAIN SIDEBAR COMPONENT
+   —————————————————————————————————————————————— */
 export function Sidebar({ role, userId }: SidebarProps) {
   const pathname = usePathname()
+  const { collapsed, mobileOpen, toggleCollapsed, closeMobile } = useSidebar()
+  const sidebarRef = useRef<HTMLElement>(null)
   const agendaHref = getAgendaHref(role, userId)
 
   const areaLabel =
@@ -81,109 +203,201 @@ export function Sidebar({ role, userId }: SidebarProps) {
       ? 'Tu área'
       : role === 'barbero'
         ? 'Mi trabajo'
-        : role === 'recepcionista'
-          ? 'Recepción'
+        : role === 'coordinador'
+          ? 'Coordinación'
           : 'Administración'
 
-  return (
-    <aside className="hidden lg:flex w-64 flex-col bg-zinc-950 border-r border-white/5 h-screen sticky top-0">
-      <div className="p-6 border-b border-white/5">
-        <Link
-          href={role === 'admin' ? '/admin' : '/'}
-          className="flex items-center gap-3 text-amber-500 font-black text-xl tracking-tighter glow-amber"
-        >
-          <Scissors className="w-7 h-7" />
-          <span>BARBER PRO</span>
-        </Link>
-        <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest mt-2 ml-1">
-          {areaLabel}
-        </p>
-      </div>
+  // Close mobile sidebar on pathname change
+  useEffect(() => {
+    closeMobile()
+  }, [pathname, closeMobile])
 
-      <nav className="flex-1 px-3 py-4 overflow-y-auto">
-        {role === 'admin' && <NavSections sections={getAdminNavSections(agendaHref)} pathname={pathname} />}
+  // Close mobile on Escape key
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && mobileOpen) closeMobile()
+    }
+    document.addEventListener('keydown', handleEsc)
+    return () => document.removeEventListener('keydown', handleEsc)
+  }, [mobileOpen, closeMobile])
 
-        {role === 'recepcionista' && (
-          <div className="space-y-0.5">
-            {recepcionNavItems.map((item) => (
-              <NavLink
-                key={item.href}
-                href={item.href === '/agenda' ? agendaHref : item.href}
-                label={item.label}
-                icon={item.icon}
-                active={isNavItemActive(pathname, item.href === '/agenda' ? agendaHref : item.href)}
-              />
-            ))}
-          </div>
-        )}
+  /* ——— Shared sidebar inner content ——— */
+  const sidebarContent = (isMobile: boolean) => {
+    const isCollapsed = isMobile ? false : collapsed
 
-        {role === 'barbero' && (
-          <div className="space-y-0.5">
-            {barberoNavItems(agendaHref).map((item) => (
-              <NavLink
-                key={item.href}
-                href={item.href}
-                label={item.label}
-                icon={item.icon}
-                active={isNavItemActive(pathname, item.href)}
-              />
-            ))}
-          </div>
-        )}
-
-        {role === 'cliente' && (
-          <div className="space-y-0.5">
-            {clienteNavItems.map((item) => (
-              <NavLink
-                key={item.href}
-                href={item.href}
-                label={item.label}
-                icon={item.icon}
-                active={isNavItemActive(pathname, item.href)}
-              />
-            ))}
-          </div>
-        )}
-
-        {!role || (role !== 'admin' && role !== 'recepcionista' && role !== 'barbero' && role !== 'cliente') ? (
-          <div className="space-y-0.5">
-            {recepcionNavItems.map((item) => (
-              <NavLink
-                key={item.href}
-                href={item.href}
-                label={item.label}
-                icon={item.icon}
-                active={isNavItemActive(pathname, item.href)}
-              />
-            ))}
-          </div>
-        ) : null}
-
-        <div className="pt-6 mt-4 border-t border-white/5">
+    return (
+      <>
+        {/* ── Header ── */}
+        <div className={cn(
+          'sidebar-header',
+          isCollapsed && 'sidebar-header--collapsed'
+        )}>
           <Link
-            href="/"
-            className="flex items-center gap-3 px-4 py-2.5 text-zinc-500 hover:text-white hover:bg-white/5 rounded-xl font-bold transition-all text-sm"
+            href={role === 'admin' ? '/admin' : '/'}
+            onClick={isMobile ? closeMobile : undefined}
+            className={cn(
+              'flex items-center text-amber-500 font-black tracking-tighter glow-amber transition-all duration-300',
+              isCollapsed ? 'justify-center text-base' : 'gap-3 text-xl'
+            )}
           >
-            <Home size={18} />
-            Sitio público
+            <Scissors className={cn('shrink-0', isCollapsed ? 'w-6 h-6' : 'w-7 h-7')} />
+            {!isCollapsed && <span className="sidebar-label">BARBER PRO</span>}
           </Link>
-        </div>
-      </nav>
+          {!isCollapsed && (
+            <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest mt-2 ml-1 sidebar-label">
+              {areaLabel}
+            </p>
+          )}
 
-      <div className="p-4 border-t border-white/5">
-        <div className="bg-gradient-to-br from-amber-500/10 to-orange-500/10 border border-amber-500/20 rounded-2xl p-4">
-          <p className="text-xs font-bold text-amber-400 mb-1">
-            {role === 'cliente' ? 'Club de lealtad' : 'Atajos'}
-          </p>
-          <p className="text-[10px] text-zinc-500 leading-relaxed">
-            {role === 'cliente'
-              ? 'Acumula puntos por cada visita.'
-              : role === 'admin'
-                ? 'Usa el panel para el resumen; el menú lateral para cada módulo.'
-                : 'Agenda y recepción son tu flujo diario.'}
-          </p>
+          {/* Mobile close button */}
+          {isMobile && (
+            <button
+              onClick={closeMobile}
+              className="absolute top-5 right-4 w-8 h-8 flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
+              aria-label="Cerrar menú"
+            >
+              <X size={20} />
+            </button>
+          )}
         </div>
-      </div>
-    </aside>
+
+        {/* ── Navigation ── */}
+        <nav className={cn(
+          'sidebar-nav',
+          isCollapsed && 'sidebar-nav--collapsed'
+        )}>
+          {role === 'admin' && (
+            <NavSections
+              sections={getAdminNavSections(agendaHref)}
+              pathname={pathname}
+              collapsed={isCollapsed}
+            />
+          )}
+
+          {role === 'coordinador' && (
+            <NavSections
+              sections={getCoordinadorNavSections(agendaHref)}
+              pathname={pathname}
+              collapsed={isCollapsed}
+            />
+          )}
+
+          {role === 'barbero' && (
+            <FlatNavItems
+              items={barberoNavItems(agendaHref)}
+              pathname={pathname}
+              collapsed={isCollapsed}
+            />
+          )}
+
+          {role === 'cliente' && (
+            <FlatNavItems
+              items={clienteNavItems}
+              pathname={pathname}
+              collapsed={isCollapsed}
+            />
+          )}
+
+          {(!role || !['admin', 'coordinador', 'barbero', 'cliente'].includes(role)) && (
+            <FlatNavItems
+              items={clienteNavItems}
+              pathname={pathname}
+              collapsed={isCollapsed}
+            />
+          )}
+
+          {/* ── Public site link ── */}
+          <div className="pt-4 mt-4 border-t border-white/5">
+            <NavLink
+              href="/"
+              label="Sitio público"
+              icon={Home}
+              active={false}
+              collapsed={isCollapsed}
+            />
+          </div>
+        </nav>
+
+        {/* ── Footer card (hidden when collapsed) ── */}
+        {!isCollapsed && (
+          <div className="sidebar-footer">
+            <div className="bg-gradient-to-br from-amber-500/10 to-orange-500/10 border border-amber-500/20 rounded-2xl p-4">
+              <p className="text-xs font-bold text-amber-400 mb-1">
+                {role === 'cliente' ? 'Club de lealtad' : 'Atajos'}
+              </p>
+              <p className="text-[10px] text-zinc-500 leading-relaxed">
+                {role === 'cliente'
+                  ? 'Acumula puntos por cada visita.'
+                  : role === 'admin'
+                    ? 'Usa el panel para el resumen; el menú lateral para cada módulo.'
+                    : role === 'coordinador'
+                      ? 'Caja, arqueo y contabilidad son tu flujo diario.'
+                      : 'Agenda y ventas son tu flujo diario.'}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* ── Desktop collapse toggle ── */}
+        {!isMobile && (
+          <Tooltip label={collapsed ? 'Expandir menú' : 'Contraer menú'} show={collapsed}>
+            <button
+              onClick={toggleCollapsed}
+              className="sidebar-toggle-btn"
+              aria-label={collapsed ? 'Expandir menú' : 'Contraer menú'}
+            >
+              {collapsed ? (
+                <ChevronRight size={16} className="text-amber-500" />
+              ) : (
+                <>
+                  <ChevronLeft size={16} className="text-amber-500" />
+                  <span className="text-xs text-zinc-500 font-bold sidebar-label">Contraer</span>
+                </>
+              )}
+            </button>
+          </Tooltip>
+        )}
+      </>
+    )
+  }
+
+  return (
+    <>
+      {/* ══════════════════════════════════════════════
+          DESKTOP SIDEBAR
+          ══════════════════════════════════════════════ */}
+      <aside
+        ref={sidebarRef}
+        className={cn(
+          'sidebar-desktop',
+          collapsed ? 'sidebar-desktop--collapsed' : 'sidebar-desktop--expanded'
+        )}
+      >
+        {sidebarContent(false)}
+      </aside>
+
+      {/* ══════════════════════════════════════════════
+          MOBILE OVERLAY + SIDEBAR
+          ══════════════════════════════════════════════ */}
+      {/* Backdrop */}
+      <div
+        className={cn(
+          'sidebar-overlay',
+          mobileOpen ? 'sidebar-overlay--visible' : 'sidebar-overlay--hidden'
+        )}
+        onClick={closeMobile}
+        aria-hidden="true"
+      />
+
+      {/* Mobile drawer */}
+      <aside
+        className={cn(
+          'sidebar-mobile',
+          mobileOpen ? 'sidebar-mobile--open' : 'sidebar-mobile--closed'
+        )}
+      >
+        {sidebarContent(true)}
+      </aside>
+    </>
   )
 }

@@ -40,6 +40,7 @@ export default function BarberoPage() {
     semana: { citas: 0, ventas: 0, comision: 0 }
   })
   const [citas, setCitas] = useState<Cita[]>([])
+  const [finanzas, setFinanzas] = useState({ saldo_adelantos: 0, total_sanciones: 0, total_bonos: 0 })
   const [loading, setLoading] = useState(true)
   const [filtroFecha, setFiltroFecha] = useState('hoy')
   const [filtroEstado, setFiltroEstado] = useState('todos')
@@ -164,6 +165,18 @@ export default function BarberoPage() {
 
       setStats({ hoy: hoyStats, semana: semanaStats })
       setCitas(transformedCitas)
+      
+      // Fetch finanzas (Adelantos, Sanciones, Bonos pendientes)
+      try {
+        const finReq = await fetch(`/api/comisiones?barbero_id=${user.id}&estado=pendiente`)
+        if (finReq.ok) {
+          const finData = await finReq.json()
+          setFinanzas(finData.finanzas || { saldo_adelantos: 0, total_sanciones: 0, total_bonos: 0 })
+        }
+      } catch (err) {
+        console.error('Error fetching finanzas', err)
+      }
+
     } catch (error) {
       console.error('Error:', error)
     } finally {
@@ -174,6 +187,7 @@ export default function BarberoPage() {
   const getEstadoBadge = (estado: string) => {
     const variants = {
       pendiente: 'warning' as const,
+      pendiente_pago: 'warning' as const,
       confirmado: 'info' as const,
       en_proceso: 'info' as const,
       completado: 'success' as const,
@@ -245,7 +259,7 @@ export default function BarberoPage() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
         <Card className="border-none bg-zinc-900 shadow-xl">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -303,6 +317,22 @@ export default function BarberoPage() {
             </div>
           </CardContent>
         </Card>
+        
+        <Card className="border-none bg-zinc-900 shadow-xl">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest">Deuda / Préstamos</p>
+                <p className="text-3xl font-black text-red-500 mt-1 tracking-tighter">
+                  {formatCurrency(finanzas.saldo_adelantos + finanzas.total_sanciones)}
+                </p>
+                <p className="text-[9px] font-bold text-zinc-600 mt-1 uppercase">
+                  (Adelantos: {formatCurrency(finanzas.saldo_adelantos)} | Sanc.: {formatCurrency(finanzas.total_sanciones)})
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Filters & Control */}
@@ -331,6 +361,7 @@ export default function BarberoPage() {
                 className="w-full h-12 bg-zinc-950 border border-white/10 rounded-xl px-4 text-sm font-bold text-white focus:border-amber-500/50 outline-none transition-all"
               >
                 <option value="todos">Todos</option>
+                <option value="pendiente_pago">Pendiente Pago</option>
                 <option value="pendiente">Pendientes</option>
                 <option value="confirmado">Confirmadas</option>
                 <option value="en_proceso">En proceso</option>
@@ -384,6 +415,27 @@ export default function BarberoPage() {
                     </div>
                     
                     <div className="flex gap-3">
+                      {cita.estado === 'pendiente_pago' && (
+                        <Button 
+                          onClick={async () => {
+                            try {
+                              const res = await fetch('/api/citas/verificar-pago', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ citaId: cita.id })
+                              })
+                              if (!res.ok) throw new Error('Error al verificar')
+                              success('Pago verificado y cita confirmada')
+                              loadData()
+                            } catch (e) {
+                              toastError('No se pudo verificar el pago')
+                            }
+                          }}
+                          className="flex-1 h-12 uppercase tracking-widest font-black bg-amber-500 hover:bg-amber-600 text-black"
+                        >
+                          ✅ Verificar Pago
+                        </Button>
+                      )}
                       {cita.estado === 'pendiente' && (
                         <Button 
                           onClick={() => iniciarServicio(cita.id)}

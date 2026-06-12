@@ -21,6 +21,7 @@ interface Producto {
   precio_costo: number | null
   precio_venta: number
   categoria: string | null
+  image_url: string | null
   is_active: boolean
 }
 
@@ -39,6 +40,7 @@ export default function ProductosPage() {
     precio_costo: 0,
     precio_venta: 0,
     categoria: '',
+    image_url: '',
   })
   const router = useRouter()
   const supabase = createClient()
@@ -65,6 +67,10 @@ export default function ProductosPage() {
     }
   }
 
+  const isValidImageUrl = (url: string) => {
+    return url.match(/^https?:\/\/.+\.(jpg|jpeg|png|webp|gif|svg)(\?.*)?$/i) !== null || url.includes('images.unsplash.com') || url.includes('supabase.co/storage')
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
@@ -80,6 +86,7 @@ export default function ProductosPage() {
             precio_costo: formData.precio_costo,
             precio_venta: formData.precio_venta,
             categoria: formData.categoria,
+            image_url: formData.image_url,
           })
           .eq('id', editingProducto.id)
 
@@ -96,6 +103,7 @@ export default function ProductosPage() {
             precio_costo: formData.precio_costo,
             precio_venta: formData.precio_venta,
             categoria: formData.categoria,
+            image_url: formData.image_url,
             is_active: true,
           })
 
@@ -113,6 +121,7 @@ export default function ProductosPage() {
         precio_costo: 0,
         precio_venta: 0,
         categoria: '',
+        image_url: '',
       })
       loadProductos()
     } catch (error: any) {
@@ -263,8 +272,19 @@ export default function ProductosPage() {
                   return (
                     <tr key={producto.id} className="group hover:bg-white/[0.02] transition-colors">
                       <td className="py-6 px-6">
-                         <p className="font-black text-white group-hover:text-amber-500 transition-colors uppercase tracking-tight">{producto.nombre}</p>
-                         <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest mt-0.5">{producto.categoria || 'SIN CATEGORIA'}</p>
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 bg-zinc-800 rounded-lg overflow-hidden flex-shrink-0">
+                            {producto.image_url ? (
+                              <img src={producto.image_url} alt={producto.nombre} className="w-full h-full object-cover" />
+                            ) : (
+                              <Package className="w-full h-full p-3 text-zinc-600" />
+                            )}
+                          </div>
+                          <div>
+                            <p className="font-black text-white group-hover:text-amber-500 transition-colors uppercase tracking-tight">{producto.nombre}</p>
+                            <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest mt-0.5">{producto.categoria || 'SIN CATEGORIA'}</p>
+                          </div>
+                        </div>
                       </td>
                       <td className="py-6 px-6">
                          <code className="text-[10px] font-black text-zinc-400 bg-white/5 px-2 py-1 rounded-md tracking-widest uppercase">
@@ -321,6 +341,7 @@ export default function ProductosPage() {
                                 precio_costo: producto.precio_costo || 0,
                                 precio_venta: producto.precio_venta,
                                 categoria: producto.categoria || '',
+                                image_url: producto.image_url || '',
                               })
                               setShowModal(true)
                             }}
@@ -399,6 +420,25 @@ export default function ProductosPage() {
                     onChange={(e) => setFormData({ ...formData, categoria: e.target.value })}
                     className="bg-zinc-900"
                   />
+                  <div className="md:col-span-2">
+                    <Input
+                      label="URL de la Imagen"
+                      placeholder="https://..."
+                      value={formData.image_url}
+                      onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
+                      className="bg-zinc-900"
+                    />
+                    {formData.image_url && isValidImageUrl(formData.image_url) && (
+                      <div className="mt-4 w-32 h-32 rounded-xl overflow-hidden border border-white/10 relative group">
+                        <img 
+                          src={formData.image_url} 
+                          alt="Preview" 
+                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
+                          onError={(e) => (e.currentTarget.style.display = 'none')}
+                        />
+                      </div>
+                    )}
+                  </div>
                   <div className="md:col-span-2 space-y-2">
                     <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-1">Descripción Breve</label>
                     <textarea

@@ -1,6 +1,6 @@
 'use client'
 
-import { Calendar, CalendarDays, ShoppingBag, Clock } from 'lucide-react'
+import { Calendar, CalendarDays, ShoppingBag, Clock, Gift } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 const actions = [
@@ -12,9 +12,9 @@ const actions = [
     accent: 'hover:border-amber-500/50 hover:bg-amber-500/5',
   },
   {
-    label: 'Recepción',
-    sub: 'Llegadas y check-in',
-    href: '/recepcion',
+    label: 'Coordinación',
+    sub: 'Caja y contabilidad',
+    href: '/coordinador',
     icon: CalendarDays,
     accent: 'hover:border-blue-500/40 hover:bg-blue-500/5',
   },
@@ -26,11 +26,25 @@ const actions = [
     accent: 'hover:border-green-500/40 hover:bg-green-500/5',
   },
   {
+    label: 'Horarios',
+    sub: 'Gestión de turnos',
+    href: '/admin/horarios',
+    icon: Clock,
+    accent: 'hover:border-purple-500/40 hover:bg-purple-500/5',
+  },
+  {
     label: 'Asistencia',
     sub: 'Turnos del equipo',
     href: '/admin/asistencia',
     icon: Clock,
     accent: 'hover:border-orange-500/40 hover:bg-orange-500/5',
+  },
+  {
+    label: 'Lealtad',
+    sub: 'Programa y metas',
+    href: '/admin/lealtad',
+    icon: Gift,
+    accent: 'hover:border-amber-500/40 hover:bg-amber-500/5',
   },
 ]
 

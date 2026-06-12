@@ -6,11 +6,11 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { useRouter } from 'next/navigation'
-import { Plus, Trash2, Camera, ArrowLeft, X, Save, Image as ImageIcon, User, Layers } from 'lucide-react'
+import { Plus, Trash2, Camera, ArrowLeft, X, Save, Image as ImageIcon, User, Layers, Edit, Eye, EyeOff, RotateCcw } from 'lucide-react'
 import { Badge } from '@/components/ui/Badge'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/components/ui/Toast'
-
+import { isValidImageUrl } from '@/lib/validators'
 
 interface PortafolioItem {
   id: string
@@ -18,16 +18,24 @@ interface PortafolioItem {
   categoria: string
   descripcion: string
   barbero_id: string
+  titulo?: string | null
+  sort_order?: number
+  is_active?: boolean
+  deleted_at: string | null
 }
 
+type FilterType = 'todos' | 'activos' | 'eliminados'
+
 export default function AdminPortafolioPage() {
-  const { error: toastError } = useToast()
+  const { error: toastError, success: toastSuccess } = useToast()
   const [items, setItems] = useState<PortafolioItem[]>([])
   const [barberos, setBarberos] = useState<{ id: string, full_name: string }[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
+  const [editing, setEditing] = useState<PortafolioItem | null>(null)
+  const [filter, setFilter] = useState<FilterType>('activos')
   const [formData, setFormData] = useState({
-    image_url: '', categoria: 'Fade', descripcion: '', barbero_id: ''
+    image_url: '', categoria: 'Fade', descripcion: '', barbero_id: '', titulo: '', sort_order: 0, is_active: true
   })
 
   const router = useRouter()
@@ -35,7 +43,7 @@ export default function AdminPortafolioPage() {
 
   useEffect(() => {
     loadData()
-  }, [])
+  }, [filter])
 
   const loadData = async () => {
     try {
@@ -45,10 +53,25 @@ export default function AdminPortafolioPage() {
       const { data: bData } = await supabase.from('profiles').select('id, full_name').eq('role', 'barbero').eq('is_active', true)
       if (bData) setBarberos(bData)
 
-      const { data: pData } = await supabase.from('portafolio').select('*').order('created_at', { ascending: false })
+      let query = supabase
+        .from('portafolio')
+        .select('*')
+        .order('sort_order', { ascending: true })
+        .order('created_at', { ascending: false })
+
+      if (filter === 'activos') {
+        query = query.is('deleted_at', null).eq('is_active', true)
+      } else if (filter === 'eliminados') {
+        query = query.not('deleted_at', 'is', null)
+      } else {
+        query = query.is('deleted_at', null)
+      }
+
+      const { data: pData } = await query
       if (pData) setItems(pData)
-    } catch (e) {
+    } catch (e: any) {
       console.error(e)
+      toastError(e.message)
     } finally {
       setLoading(false)
     }
@@ -56,24 +79,53 @@ export default function AdminPortafolioPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!isValidImageUrl(formData.image_url)) {
+      toastError('La URL de la imagen no es válida o no es segura.')
+      return
+    }
+
     try {
-      const { error } = await supabase.from('portafolio').insert(formData)
-      if (error) throw error
+      if (editing) {
+        const { error } = await supabase.from('portafolio').update({ ...formData, updated_at: new Date().toISOString() }).eq('id', editing.id)
+        if (error) throw error
+        toastSuccess('Publicación actualizada')
+      } else {
+        const { error } = await supabase.from('portafolio').insert(formData)
+        if (error) throw error
+        toastSuccess('Imagen agregada a la galería')
+      }
       setShowModal(false)
-      setFormData({ image_url: '', categoria: 'Fade', descripcion: '', barbero_id: '' })
+      setEditing(null)
+      setFormData({ image_url: '', categoria: 'Fade', descripcion: '', barbero_id: '', titulo: '', sort_order: 0, is_active: true })
       loadData()
-    } catch (e: any) {
+    } catch (e: unknown) {
       toastError('Error: ' + (e instanceof Error ? e.message : 'Error'))
     }
   }
 
+  const toggleActive = async (item: PortafolioItem) => {
+    await supabase.from('portafolio').update({ is_active: !item.is_active, updated_at: new Date().toISOString() }).eq('id', item.id)
+    loadData()
+  }
+
   const deleteItem = async (id: string) => {
-    if (!confirm('¿Eliminar esta imagen de la galería pública?')) return
+    if (!confirm('¿Eliminar lógicamente esta imagen de la galería pública?')) return
     try {
-      await supabase.from('portafolio').delete().eq('id', id)
+      await supabase.from('portafolio').update({ deleted_at: new Date().toISOString(), is_active: false }).eq('id', id)
+      toastSuccess('Imagen eliminada')
       loadData()
     } catch (e: any) {
       toastError('Error al eliminar')
+    }
+  }
+
+  const restoreItem = async (id: string) => {
+    try {
+      await supabase.from('portafolio').update({ deleted_at: null, is_active: true }).eq('id', id)
+      toastSuccess('Imagen restaurada')
+      loadData()
+    } catch (e: any) {
+      toastError('Error al restaurar')
     }
   }
 
@@ -103,35 +155,90 @@ export default function AdminPortafolioPage() {
             <p className="text-zinc-500 font-medium mt-2 text-lg">Curaduría visual de los mejores trabajos del equipo</p>
           </div>
         </div>
-        <Button variant="primary" size="lg" className="shadow-lg shadow-amber-500/20 font-black uppercase tracking-widest h-14 px-8" onClick={() => setShowModal(true)}>
-          <Plus className="w-5 h-5 mr-2 stroke-[3px]" />
-          Nueva Exposición
-        </Button>
+        <div className="flex flex-col md:flex-row gap-4">
+          <select 
+            value={filter} 
+            onChange={(e) => setFilter(e.target.value as FilterType)}
+            className="h-14 bg-zinc-900 border border-white/10 rounded-2xl px-4 text-white font-bold uppercase text-xs"
+          >
+            <option value="activos">Solo Visibles</option>
+            <option value="todos">Todos (Ocultos)</option>
+            <option value="eliminados">Eliminados</option>
+          </select>
+          <Button variant="primary" size="lg" className="shadow-lg shadow-amber-500/20 font-black uppercase tracking-widest h-14 px-8" onClick={() => { setEditing(null); setShowModal(true) }}>
+            <Plus className="w-5 h-5 mr-2 stroke-[3px]" />
+            Nueva Exposición
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
         {items.map(item => (
-          <Card key={item.id} className="group relative overflow-hidden bg-zinc-900 border-white/5 shadow-2xl transition-all card-hover rounded-3xl">
+          <Card key={item.id} className={cn(
+            "group relative overflow-hidden bg-zinc-900 border-white/5 shadow-2xl transition-all card-hover rounded-3xl",
+            (!item.is_active || item.deleted_at) && "opacity-50"
+          )}>
             <div className="aspect-[4/5] bg-zinc-800 relative overflow-hidden">
-              <img src={item.image_url} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt={item.descripcion} />
+              <img 
+                src={item.image_url} 
+                loading="lazy"
+                onError={(e) => { e.currentTarget.src = 'https://images.unsplash.com/photo-1599351431202-1e0f0137899a?w=400&q=80' }}
+                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
+                alt={item.descripcion} 
+              />
               <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent opacity-60"></div>
 
               <Badge variant="warning" className="absolute top-4 left-4 bg-amber-500 text-black border-none uppercase font-black text-[10px] tracking-widest px-3 py-1 shadow-xl">
                 {item.categoria}
               </Badge>
 
-              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 backdrop-blur-sm">
-                <button
-                  onClick={() => deleteItem(item.id)}
-                  className="w-14 h-14 rounded-full bg-red-500 text-white flex items-center justify-center shadow-2xl hover:bg-red-600 transition-colors transform translate-y-4 group-hover:translate-y-0 duration-300"
-                >
-                  <Trash2 className="w-6 h-6" />
-                </button>
+              {item.deleted_at ? (
+                <Badge variant="outline" className="absolute top-4 right-4 bg-red-500/80 text-white border-red-400 uppercase font-black text-[10px] tracking-widest px-3 py-1">
+                  Eliminado
+                </Badge>
+              ) : !item.is_active ? (
+                <Badge variant="outline" className="absolute top-4 right-4 bg-zinc-500/20 text-zinc-300 border-zinc-500/30 uppercase font-black text-[10px] tracking-widest px-3 py-1">
+                  Oculto
+                </Badge>
+              ) : null}
+
+              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 backdrop-blur-sm gap-3">
+                {item.deleted_at ? (
+                  <button
+                    onClick={() => restoreItem(item.id)}
+                    className="w-12 h-12 rounded-full bg-green-500 text-white flex items-center justify-center shadow-2xl hover:bg-green-600 transition-colors"
+                  >
+                    <RotateCcw className="w-5 h-5" />
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => { setEditing(item); setFormData({ image_url: item.image_url, categoria: item.categoria, descripcion: item.descripcion, barbero_id: item.barbero_id, titulo: item.titulo || '', sort_order: item.sort_order ?? 0, is_active: item.is_active !== false }); setShowModal(true) }}
+                      className="w-12 h-12 rounded-full bg-amber-500 text-black flex items-center justify-center shadow-2xl"
+                    >
+                      <Edit className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={() => toggleActive(item)}
+                      className="w-12 h-12 rounded-full bg-zinc-800 text-white flex items-center justify-center shadow-2xl"
+                    >
+                      {item.is_active === false ? <Eye size={18} /> : <EyeOff size={18} />}
+                    </button>
+                    <button
+                      onClick={() => deleteItem(item.id)}
+                      className="w-12 h-12 rounded-full bg-red-500 text-white flex items-center justify-center shadow-2xl hover:bg-red-600 transition-colors"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  </>
+                )}
               </div>
             </div>
 
             <CardContent className="p-6">
-              <p className="text-sm font-bold text-zinc-300 mb-4 line-clamp-2 min-h-[40px] leading-relaxed italic">"{item.descripcion}"</p>
+              {item.titulo && <p className="text-xs font-black uppercase text-amber-500 mb-1">{item.titulo}</p>}
+              <p className="text-sm font-bold text-zinc-300 mb-2 line-clamp-2 min-h-[40px] leading-relaxed italic">"{item.descripcion}"</p>
+              <p className="text-[10px] text-zinc-600 font-bold uppercase">Orden: {item.sort_order ?? 0}</p>
               <div className="flex items-center gap-3 pt-4 border-t border-white/5">
                 <div className="w-8 h-8 rounded-full bg-zinc-800 border border-white/10 flex items-center justify-center text-[10px] font-black uppercase text-amber-500">
                   {barberos.find(b => b.id === item.barbero_id)?.full_name.charAt(0) || '?'}
@@ -151,7 +258,13 @@ export default function AdminPortafolioPage() {
       {items.length === 0 && (
         <div className="py-32 text-center border-2 border-dashed border-white/5 rounded-3xl">
           <Camera size={64} className="mx-auto text-zinc-800 mb-4 opacity-30" />
-          <p className="text-zinc-500 font-bold uppercase tracking-widest text-xs">El portafolio está listo para ser inaugurado</p>
+          <p className="text-zinc-500 font-bold uppercase tracking-widest text-xs mb-4">No hay publicaciones para este filtro</p>
+          {filter !== 'eliminados' && (
+            <Button variant="primary" onClick={() => { setEditing(null); setShowModal(true) }} className="font-bold uppercase tracking-widest">
+              <Plus className="w-4 h-4 mr-2" />
+              Inaugurar Portafolio
+            </Button>
+          )}
         </div>
       )}
 
@@ -162,7 +275,7 @@ export default function AdminPortafolioPage() {
             <CardHeader className="flex flex-row items-center justify-between border-b border-white/5 p-8 bg-zinc-900/50">
               <div>
                 <CardTitle className="text-2xl font-black uppercase text-white leading-none">
-                  Subir a <span className="text-amber-500">Exposición</span>
+                  {editing ? 'Editar' : 'Subir a'} <span className="text-amber-500">Exposición</span>
                 </CardTitle>
                 <p className="text-zinc-500 text-xs mt-2 font-medium">Publica los resultados de tus mejores sesiones</p>
               </div>
@@ -175,12 +288,29 @@ export default function AdminPortafolioPage() {
             </CardHeader>
             <form onSubmit={handleSubmit}>
               <CardContent className="p-8 space-y-6">
+                <div>
+                  <Input
+                    label="URL de la Imagen"
+                    required
+                    placeholder="https://images.unsplash.com/..."
+                    value={formData.image_url}
+                    onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
+                    className="bg-zinc-900"
+                  />
+                  <p className="text-xs text-amber-400 mt-2 font-medium">Sugerencia: Usa una imagen de buena calidad de tus trabajos. Recomendado: 1080x1080px o 1080x1350px.</p>
+                </div>
                 <Input
-                  label="URL de la Imagen"
-                  required
-                  placeholder="https://images.unsplash.com/..."
-                  value={formData.image_url}
-                  onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
+                  label="Título (opcional)"
+                  placeholder="Fade premium con diseño"
+                  value={formData.titulo}
+                  onChange={(e) => setFormData({ ...formData, titulo: e.target.value })}
+                  className="bg-zinc-900"
+                />
+                <Input
+                  label="Orden en carrusel"
+                  type="number"
+                  value={formData.sort_order}
+                  onChange={(e) => setFormData({ ...formData, sort_order: parseInt(e.target.value) || 0 })}
                   className="bg-zinc-900"
                 />
 
@@ -229,12 +359,22 @@ export default function AdminPortafolioPage() {
                   />
                 </div>
 
+                <label className="flex items-center gap-2 text-sm text-zinc-400">
+                  <input type="checkbox" checked={formData.is_active} onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })} />
+                  Visible en galería y carrusel del index
+                </label>
+
                 {/* Image Preview if URL exists */}
-                {formData.image_url && (
+                {formData.image_url && isValidImageUrl(formData.image_url) && (
                   <div className="relative aspect-video rounded-2xl overflow-hidden border border-white/5 bg-zinc-950">
-                    <img src={formData.image_url} className="w-full h-full object-cover opacity-50" />
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <Badge variant="outline" className="text-zinc-400 font-bold uppercase text-[10px] tracking-widest">Vista Previa Active</Badge>
+                    <img 
+                      src={formData.image_url} 
+                      loading="lazy"
+                      className="w-full h-full object-cover opacity-50" 
+                      onError={(e) => { e.currentTarget.style.display = 'none'; toastError('No se pudo cargar la vista previa') }}
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <Badge variant="outline" className="text-zinc-400 font-bold uppercase text-[10px] tracking-widest">Vista Previa Activa</Badge>
                     </div>
                   </div>
                 )}
@@ -264,4 +404,3 @@ export default function AdminPortafolioPage() {
     </div>
   )
 }
-

@@ -19,7 +19,7 @@ export async function GET(
     const fechaInicio = searchParams.get('fecha_inicio') || new Date().toISOString().split('T')[0]
     const fechaFin = searchParams.get('fecha_fin') || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 
-    // Validar permisos: solo admin, barbero mismo, o recepcionista pueden ver
+    // Validar permisos: solo admin, barbero mismo, o coordinador pueden ver
     const { data: userProfile } = await supabase
       .from('profiles')
       .select('role')
@@ -28,9 +28,9 @@ export async function GET(
 
     const isAdmin = userProfile?.role === 'admin'
     const isBarberoPropios = user.id === barberoId
-    const isRecepcionista = userProfile?.role === 'recepcionista'
+    const isCoordinador = userProfile?.role === 'coordinador'
 
-    if (!isAdmin && !isBarberoPropios && !isRecepcionista) {
+    if (!isAdmin && !isBarberoPropios && !isCoordinador) {
       return NextResponse.json({ error: 'No tienes permisos' }, { status: 403 })
     }
 

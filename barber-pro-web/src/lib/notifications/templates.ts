@@ -70,6 +70,8 @@ export interface EmailTemplateInput {
   fechaAnterior?: string
   horaAnterior?: string
   pedidoId?: string
+  anticipo?: string
+  verificadoPor?: string
 }
 
 export function buildEmail(
@@ -209,6 +211,62 @@ export function buildEmail(
           <p>Tu horario semanal fue actualizado por administración. Revisa tu agenda para ver disponibilidad.</p>
           ${cta(`${SITE}/agenda`, 'Ver agenda')}`,
           'Tu horario fue modificado'
+        ),
+      }
+
+    case 'pago_pendiente_equipo':
+      return {
+        subject: `💰 Anticipo QR pendiente — ${nombre}`,
+        html: layout(
+          `<h2 style="margin:0 0 8px;color:#f59e0b;font-size:20px;">Pago QR por verificar</h2>
+          <p><strong>${nombre}</strong> dice que realizó un pago QR como anticipo para su cita. Verifica el comprobante en tu app bancaria.</p>
+          ${detailBox([
+            { label: 'Cliente', value: nombre },
+            { label: 'Servicio', value: data.servicio || '—' },
+            { label: 'Anticipo', value: data.anticipo || '—' },
+            { label: 'Fecha', value: data.fecha || '—' },
+            { label: 'Hora', value: data.hora || '—' },
+          ])}
+          <p style="color:#a1a1aa;font-size:13px;">Ingresa al sistema y presiona <strong>"Verificar Pago"</strong> una vez confirmes el depósito.</p>
+          ${cta(`${SITE}/barbero`, 'Ir al panel')}`,
+          'Hay un pago QR pendiente de verificar'
+        ),
+      }
+
+    case 'pago_verificado_cliente':
+      return {
+        subject: '✅ Pago verificado — Tu cita está confirmada',
+        html: layout(
+          `<h2 style="margin:0 0 8px;color:#22c55e;font-size:20px;">¡Pago confirmado!</h2>
+          <p>Hola <strong>${nombre}</strong>, tu anticipo fue verificado exitosamente. Tu cita quedó confirmada.</p>
+          ${detailBox([
+            { label: 'Servicio', value: data.servicio || '—' },
+            { label: 'Anticipo pagado', value: data.anticipo || '—' },
+            { label: 'Fecha', value: data.fecha || '—' },
+            { label: 'Hora', value: data.hora || '—' },
+            { label: 'Barbero', value: data.barbero || '—' },
+          ])}
+          <p>Te esperamos puntual. El saldo restante se paga directamente en la barbería.</p>
+          ${cta(`${SITE}/cliente`, 'Ver mis citas')}`,
+          'Tu anticipo fue verificado y la cita confirmada'
+        ),
+      }
+
+    case 'pago_verificado_admin':
+      return {
+        subject: `✅ Pago verificado — ${nombre}`,
+        html: layout(
+          `<h2 style="margin:0 0 8px;color:#22c55e;font-size:20px;">Anticipo verificado</h2>
+          <p>El pago QR de <strong>${nombre}</strong> fue verificado por <strong>${data.verificadoPor || 'el equipo'}</strong>.</p>
+          ${detailBox([
+            { label: 'Cliente', value: nombre },
+            { label: 'Servicio', value: data.servicio || '—' },
+            { label: 'Anticipo', value: data.anticipo || '—' },
+            { label: 'Fecha', value: data.fecha || '—' },
+            { label: 'Hora', value: data.hora || '—' },
+          ])}
+          ${cta(`${SITE}/admin`, 'Ir al panel')}`,
+          'Un pago QR fue verificado'
         ),
       }
 

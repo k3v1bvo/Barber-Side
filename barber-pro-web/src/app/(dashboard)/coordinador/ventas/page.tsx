@@ -1,0 +1,243 @@
+'use client'
+
+import { useEffect, useState, useCallback } from 'react'
+import { Card, CardContent } from '@/components/ui/Card'
+import { Button } from '@/components/ui/Button'
+import { Badge } from '@/components/ui/Badge'
+import { formatCurrency } from '@/lib/utils'
+import { Receipt, Plus, X } from 'lucide-react'
+
+import { createClient } from '@/lib/supabase/client'
+
+interface PlanCuenta { codigo: string; detalle: string; tipo: string }
+interface Transaction {
+  id: string; fecha: string; ci: string; nombre: string
+  cuenta_codigo: string; cuenta_detalle: string; glosa: string
+  costo: number; tipo_movimiento: string; metodo_pago: string | null
+  creado_en: string
+}
+interface Servicio { id: string; nombre: string; precio: number }
+interface Producto { id: string; nombre: string; precio_venta: number }
+
+export default function VentasPage() {
+  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [cuentas, setCuentas] = useState<PlanCuenta[]>([])
+  const [servicios, setServicios] = useState<Servicio[]>([])
+  const [productos, setProductos] = useState<Producto[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showForm, setShowForm] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const hoy = new Date().toISOString().split('T')[0]
+
+  const [form, setForm] = useState({
+    ci: '', nombre: '', cuenta_codigo: '', glosa: '', costo: '',
+    metodo_pago: 'efectivo', notas: '',
+  })
+
+  const loadData = useCallback(async () => {
+    const supabase = createClient()
+    const [txRes, ctasRes, { data: sData }, { data: pData }] = await Promise.all([
+      fetch(`/api/transactions?libro=VENTAS&limit=50`),
+      fetch('/api/plan-cuentas'),
+      supabase.from('servicios').select('id, nombre, precio').eq('is_active', true),
+      supabase.from('productos').select('id, nombre, precio_venta').eq('is_active', true)
+    ])
+    if (txRes.ok) setTransactions(await txRes.json())
+    if (ctasRes.ok) setCuentas(await ctasRes.json())
+    if (sData) setServicios(sData)
+    if (pData) setProductos(pData)
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { loadData() }, [loadData])
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSaving(true)
+
+    let realCuentaCodigo = form.cuenta_codigo
+    let realCuentaDetalle = form.cuenta_codigo
+    let productoId = null
+
+    if (form.cuenta_codigo.startsWith('srv-')) {
+      realCuentaCodigo = '4.1.1'
+      const srv = servicios.find(s => s.id === form.cuenta_codigo.replace('srv-', ''))
+      realCuentaDetalle = srv ? srv.nombre : 'Servicio'
+    } else if (form.cuenta_codigo.startsWith('prd-')) {
+      realCuentaCodigo = '4.1.2'
+      const prd = productos.find(p => p.id === form.cuenta_codigo.replace('prd-', ''))
+      realCuentaDetalle = prd ? prd.nombre : 'Producto'
+      productoId = prd ? prd.id : null
+    } else {
+      const cuenta = cuentas.find((c) => c.codigo === form.cuenta_codigo)
+      realCuentaDetalle = cuenta?.detalle || form.cuenta_codigo
+    }
+
+    const res = await fetch('/api/transactions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        libro: 'VENTAS',
+        ci: form.ci, nombre: form.nombre,
+        cuenta_codigo: realCuentaCodigo,
+        cuenta_detalle: realCuentaDetalle,
+        producto_id: productoId,
+        glosa: form.glosa, costo: parseFloat(form.costo),
+        tipo_movimiento: 'VENTA_SERVICIO',
+        metodo_pago: form.metodo_pago,
+        notas: form.notas || null,
+      }),
+    })
+    if (res.ok) {
+      setShowForm(false)
+      setForm({ ci: '', nombre: '', cuenta_codigo: '', glosa: '', costo: '', metodo_pago: 'efectivo', notas: '' })
+      loadData()
+    }
+    setSaving(false)
+  }
+
+  const totalHoy = transactions.filter((t) => t.fecha === hoy).reduce((s, t) => s + Number(t.costo), 0)
+  const ventasCuentas = cuentas.filter((c) => c.codigo.startsWith('4.1'))
+
+  if (loading) {
+    return <div className="flex items-center justify-center h-96"><div className="w-12 h-12 border-4 border-zinc-700 border-t-green-500 rounded-full animate-spin" /></div>
+  }
+
+  return (
+    <div className="space-y-8 animate-in fade-in duration-500 pb-20 lg:pb-0">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b border-white/5 pb-6">
+        <div>
+          <h1 className="text-4xl font-black tracking-tight text-white uppercase">
+            Ventas / <span className="text-green-500">Servicios</span>
+          </h1>
+          <p className="text-zinc-500 font-medium mt-1">Pagos de clientes por cortes, barba y productos</p>
+        </div>
+        <div className="flex items-center gap-4">
+          <Card className="border-white/5 bg-zinc-900/80">
+            <CardContent className="px-4 py-3 flex items-center gap-3">
+              <Receipt className="w-5 h-5 text-green-500" />
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Hoy</p>
+                <p className="text-lg font-black text-white">{formatCurrency(totalHoy)}</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Button variant="primary" onClick={() => setShowForm(!showForm)} className="gap-2 font-black uppercase tracking-wider">
+            {showForm ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+            {showForm ? 'Cerrar' : 'Nuevo'}
+          </Button>
+        </div>
+      </div>
+
+      {showForm && (
+        <Card className="border-green-500/30 bg-zinc-900/80 animate-in slide-in-from-top-2 duration-300">
+          <CardContent className="p-6">
+            <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-1 block">C.I.</label>
+                <input value={form.ci} onChange={(e) => setForm({ ...form, ci: e.target.value })} className="w-full h-11 bg-zinc-950 border border-white/10 rounded-xl px-4 text-sm text-white focus:border-green-500/50 outline-none" required />
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-1 block">Nombre</label>
+                <input value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} className="w-full h-11 bg-zinc-950 border border-white/10 rounded-xl px-4 text-sm text-white focus:border-green-500/50 outline-none" required />
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-1 block">Servicio / Producto</label>
+                <select value={form.cuenta_codigo} onChange={(e) => {
+                  const val = e.target.value
+                  let newCosto = form.costo
+                  let newGlosa = form.glosa
+                  if (val.startsWith('srv-')) {
+                    const s = servicios.find(x => x.id === val.replace('srv-', ''))
+                    if (s) { newCosto = s.precio.toString(); newGlosa = `Venta: ${s.nombre}` }
+                  } else if (val.startsWith('prd-')) {
+                    const p = productos.find(x => x.id === val.replace('prd-', ''))
+                    if (p) { newCosto = p.precio_venta.toString(); newGlosa = `Venta: ${p.nombre}` }
+                  }
+                  setForm({ ...form, cuenta_codigo: val, costo: newCosto, glosa: newGlosa })
+                }} className="w-full h-11 bg-zinc-950 border border-white/10 rounded-xl px-4 text-sm text-white focus:border-green-500/50 outline-none appearance-none" required>
+                  <option value="">Seleccionar...</option>
+                  <optgroup label="Servicios">
+                    {servicios.map((s) => (
+                      <option key={`srv-${s.id}`} value={`srv-${s.id}`}>{s.nombre} - {formatCurrency(s.precio)}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Productos">
+                    {productos.map((p) => (
+                      <option key={`prd-${p.id}`} value={`prd-${p.id}`}>{p.nombre} - {formatCurrency(p.precio_venta)}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Otras Cuentas de Ingreso">
+                    {ventasCuentas.map((c) => (
+                      <option key={c.codigo} value={c.codigo}>{c.detalle}</option>
+                    ))}
+                  </optgroup>
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-1 block">Glosa</label>
+                <input value={form.glosa} onChange={(e) => setForm({ ...form, glosa: e.target.value })} className="w-full h-11 bg-zinc-950 border border-white/10 rounded-xl px-4 text-sm text-white focus:border-green-500/50 outline-none" required />
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-1 block">Monto (Bs)</label>
+                <input type="number" step="0.01" min="0" value={form.costo} onChange={(e) => setForm({ ...form, costo: e.target.value })} className="w-full h-11 bg-zinc-950 border border-white/10 rounded-xl px-4 text-sm text-white focus:border-green-500/50 outline-none" required />
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-1 block">Método pago</label>
+                <select value={form.metodo_pago} onChange={(e) => setForm({ ...form, metodo_pago: e.target.value })} className="w-full h-11 bg-zinc-950 border border-white/10 rounded-xl px-4 text-sm text-white focus:border-green-500/50 outline-none appearance-none">
+                  <option value="efectivo">Efectivo</option>
+                  <option value="qr">QR</option>
+                  <option value="tarjeta">Tarjeta</option>
+                  <option value="mixto">Mixto</option>
+                </select>
+              </div>
+              <div className="md:col-span-2 lg:col-span-3 flex justify-end gap-3 pt-2">
+                <Button type="button" variant="outline" onClick={() => setShowForm(false)}>Cancelar</Button>
+                <Button type="submit" variant="primary" disabled={saving} className="font-black uppercase tracking-wider">{saving ? 'Guardando...' : 'Registrar Venta'}</Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card className="border-white/5 bg-zinc-900/50 overflow-hidden">
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-white/10 text-left">
+                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-zinc-500">Fecha</th>
+                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-zinc-500">C.I.</th>
+                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-zinc-500">Nombre</th>
+                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-zinc-500">Servicio</th>
+                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-zinc-500">Glosa</th>
+                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-zinc-500">Pago</th>
+                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-zinc-500 text-right">Monto</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {transactions.length === 0 ? (
+                  <tr><td colSpan={7} className="px-4 py-12 text-center text-zinc-600">No hay ventas registradas</td></tr>
+                ) : (
+                  transactions.map((tx) => (
+                    <tr key={tx.id} className="hover:bg-white/[0.02] transition-colors">
+                      <td className="px-4 py-3 text-zinc-400 whitespace-nowrap">{tx.fecha}</td>
+                      <td className="px-4 py-3 text-zinc-300 font-mono text-xs">{tx.ci}</td>
+                      <td className="px-4 py-3 text-white font-bold">{tx.nombre}</td>
+                      <td className="px-4 py-3 text-zinc-400 text-xs">{tx.cuenta_detalle}</td>
+                      <td className="px-4 py-3 text-zinc-300">{tx.glosa}</td>
+                      <td className="px-4 py-3">
+                        <Badge variant={tx.metodo_pago === 'qr' ? 'info' : 'default'} className="text-[10px] uppercase">{tx.metodo_pago || '—'}</Badge>
+                      </td>
+                      <td className="px-4 py-3 text-right font-black text-green-400">{formatCurrency(tx.costo)}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}

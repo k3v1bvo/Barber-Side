@@ -13,6 +13,21 @@ import {
   Clock,
   ClipboardList,
   Bell,
+  Wallet,
+  Receipt,
+  Landmark,
+  Scale,
+  ArrowDownCircle,
+  AlertTriangle,
+  Coins,
+  UserPlus,
+  Shield,
+  ClipboardCheck,
+  Gift,
+  Settings,
+  Cake,
+  Images,
+  Sliders,
 } from 'lucide-react'
 
 export interface NavItem {
@@ -29,8 +44,8 @@ export interface NavSection {
 
 export function getAgendaHref(role?: string, userId?: string): string {
   if (role === 'barbero' && userId) return `/agenda/${userId}`
-  if (role === 'admin' || role === 'recepcionista') return '/agenda'
-  return '/recepcion'
+  if (role === 'admin' || role === 'coordinador') return '/agenda'
+  return '/coordinador'
 }
 
 export function getAdminNavSections(agendaHref: string): NavSection[] {
@@ -40,10 +55,20 @@ export function getAdminNavSections(agendaHref: string): NavSection[] {
       items: [
         { label: 'Panel', href: '/admin', icon: LayoutDashboard, description: 'Resumen del día' },
         { label: 'Agenda', href: agendaHref, icon: Calendar, description: 'Citas y disponibilidad' },
-        { label: 'Recepción', href: '/recepcion', icon: CalendarDays, description: 'Check-in del día' },
         { label: 'Venta / POS', href: '/reservar', icon: ShoppingBag, description: 'Nueva cita o venta' },
         { label: 'Asistencia', href: '/admin/asistencia', icon: Clock, description: 'Turnos del personal' },
+        { label: 'Horarios', href: '/admin/horarios', icon: Clock, description: 'Plantillas y asignación' },
         { label: 'Notificaciones', href: '/notificaciones', icon: Bell, description: 'Alertas e historial' },
+      ],
+    },
+    {
+      title: 'Contabilidad',
+      items: [
+        { label: 'Caja Chica', href: '/coordinador/caja-chica', icon: Wallet, description: 'Adelantos, sanciones, depósitos' },
+        { label: 'Ventas / Servicios', href: '/coordinador/ventas', icon: Receipt, description: 'Pagos por cortes y productos' },
+        { label: 'Banco', href: '/coordinador/banco', icon: Landmark, description: 'Depósitos y retiros' },
+        { label: 'Arqueo de Caja', href: '/coordinador/arqueo', icon: Scale, description: 'Cierre diario' },
+        { label: 'Egresos', href: '/coordinador/egresos', icon: ArrowDownCircle, description: 'Gastos con/sin factura' },
       ],
     },
     {
@@ -52,15 +77,71 @@ export function getAdminNavSections(agendaHref: string): NavSection[] {
         { label: 'Servicios', href: '/admin/servicios', icon: Scissors },
         { label: 'Inventario', href: '/admin/productos', icon: Package },
         { label: 'Portafolio', href: '/admin/portafolio', icon: Camera },
+        { label: 'Equipo', href: '/admin/equipo', icon: Users, description: 'Barberos en el Home' },
       ],
     },
     {
       title: 'Administración',
       items: [
         { label: 'Usuarios', href: '/admin/usuarios', icon: Users },
+        { label: 'Sanciones', href: '/coordinador/sanciones', icon: AlertTriangle },
+        { label: 'Bonos', href: '/coordinador/bonos', icon: Gift },
+        { label: 'Cumpleaños', href: '/coordinador/cumpleanos', icon: Cake },
+        { label: 'Comisiones', href: '/admin/comisiones', icon: Coins },
+        { label: 'Lealtad', href: '/admin/lealtad', icon: Gift, description: 'Programa de recompensas' },
+        { label: 'Referidos', href: '/coordinador/referidos', icon: UserPlus, description: 'Bonos por recomendación' },
+        { label: 'Conteo Inventario', href: '/admin/inventario-fisico', icon: ClipboardCheck, description: 'Conteo físico y ajustes' },
+        { label: 'Auditoría', href: '/admin/auditoria', icon: Shield, description: 'Registro de cambios' },
         { label: 'Pedidos', href: '/admin/pedidos', icon: ClipboardList },
         { label: 'Reportes', href: '/admin/reportes', icon: BarChart3 },
+        { label: 'Configuración', href: '/admin/configuracion', icon: Settings, description: 'Ajustes globales' },
+        { label: 'Reglas Laborales', href: '/admin/reglas-laborales', icon: Sliders, description: 'Comisiones, sanciones y bonos' },
+        { label: 'Galería', href: '/admin/galeria', icon: Images, description: 'Todas las imágenes del sistema' },
         { label: 'Buscar', href: '/admin/buscar', icon: Search },
+      ],
+    },
+  ]
+}
+
+export function getCoordinadorNavSections(agendaHref: string): NavSection[] {
+  return [
+    {
+      title: 'Operación',
+      items: [
+        { label: 'Panel', href: '/coordinador', icon: LayoutDashboard, description: 'Resumen del día' },
+        { label: 'Agenda', href: agendaHref, icon: Calendar, description: 'Citas y disponibilidad' },
+        { label: 'Venta / POS', href: '/reservar', icon: ShoppingBag, description: 'Nueva cita o venta' },
+        { label: 'Asistencia', href: '/admin/asistencia', icon: Clock, description: 'Turnos del personal' },
+        { label: 'Notificaciones', href: '/notificaciones', icon: Bell, description: 'Alertas e historial' },
+      ],
+    },
+    {
+      title: 'Contabilidad',
+      items: [
+        { label: 'Caja Chica', href: '/coordinador/caja-chica', icon: Wallet, description: 'Adelantos, sanciones, depósitos' },
+        { label: 'Ventas / Servicios', href: '/coordinador/ventas', icon: Receipt, description: 'Pagos por cortes y productos' },
+        { label: 'Banco', href: '/coordinador/banco', icon: Landmark, description: 'Depósitos y retiros' },
+        { label: 'Arqueo de Caja', href: '/coordinador/arqueo', icon: Scale, description: 'Cierre diario' },
+        { label: 'Egresos', href: '/coordinador/egresos', icon: ArrowDownCircle, description: 'Gastos con/sin factura' },
+      ],
+    },
+    {
+      title: 'Control',
+      items: [
+        { label: 'Inventario', href: '/admin/productos', icon: Package, description: 'Stock y productos' },
+        { label: 'Conteo Físico', href: '/admin/inventario-fisico', icon: ClipboardCheck, description: 'Conteo y ajustes' },
+        { label: 'Sanciones', href: '/coordinador/sanciones', icon: AlertTriangle, description: 'Registro y historial' },
+        { label: 'Bonos', href: '/coordinador/bonos', icon: Gift, description: 'Premios a barberos' },
+        { label: 'Cumpleaños', href: '/coordinador/cumpleanos', icon: Cake, description: 'Verificar cumpleañeros del día' },
+        { label: 'Comisiones', href: '/admin/comisiones', icon: Coins, description: 'Cálculo y pagos' },
+        { label: 'Lealtad', href: '/admin/lealtad', icon: Gift, description: 'Programa de recompensas' },
+        { label: 'Referidos', href: '/coordinador/referidos', icon: UserPlus, description: 'Bonos por recomendación' },
+        { label: 'Reportes', href: '/admin/reportes', icon: BarChart3, description: 'Análisis y datos' },
+        { label: 'Configuración', href: '/admin/configuracion', icon: Settings, description: 'Ajustes globales y QR' },
+        { label: 'Reglas Laborales', href: '/admin/reglas-laborales', icon: Sliders, description: 'Comisiones, sanciones y bonos' },
+        { label: 'Galería del Sistema', href: '/admin/galeria', icon: Images, description: 'Imágenes subidas' },
+        { label: 'Equipo Home', href: '/admin/equipo', icon: Users, description: 'Miembros web' },
+        { label: 'Buscar', href: '/admin/buscar', icon: Search, description: 'Búsqueda global' },
       ],
     },
   ]
@@ -69,13 +150,6 @@ export function getAdminNavSections(agendaHref: string): NavSection[] {
 export function flattenSections(sections: NavSection[]): NavItem[] {
   return sections.flatMap((s) => s.items)
 }
-
-export const recepcionNavItems: NavItem[] = [
-  { label: 'Agenda', href: '/agenda', icon: Calendar },
-  { label: 'Recepción', href: '/recepcion', icon: CalendarDays },
-  { label: 'Venta / POS', href: '/reservar', icon: ShoppingBag },
-  { label: 'Notificaciones', href: '/notificaciones', icon: Bell },
-]
 
 export const barberoNavItems = (agendaHref: string): NavItem[] => [
   { label: 'Mi panel', href: '/barbero', icon: LayoutDashboard },
@@ -86,10 +160,8 @@ export const barberoNavItems = (agendaHref: string): NavItem[] => [
 
 export const clienteNavItems: NavItem[] = [
   { label: 'Mis Citas', href: '/cliente', icon: Calendar },
-  { label: 'Calendario', href: '/calendario', icon: CalendarDays },
   { label: 'Reservar', href: '/reservar', icon: Scissors },
   { label: 'Tienda', href: '/tienda', icon: ShoppingBag },
-  { label: 'Galería', href: '/galeria', icon: Camera },
   { label: 'Notificaciones', href: '/notificaciones', icon: Bell },
 ]
 
@@ -97,7 +169,7 @@ export function isDashboardRoute(pathname: string): boolean {
   const prefixes = [
     '/admin',
     '/agenda',
-    '/recepcion',
+    '/coordinador',
     '/reservar',
     '/barbero',
     '/cliente',
@@ -109,6 +181,7 @@ export function isDashboardRoute(pathname: string): boolean {
 
 export function isNavItemActive(pathname: string, href: string): boolean {
   if (href === '/admin') return pathname === '/admin'
+  if (href === '/coordinador') return pathname === '/coordinador'
   if (href.startsWith('/agenda')) {
     return pathname === href || pathname.startsWith('/agenda/')
   }

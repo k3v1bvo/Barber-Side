@@ -1,0 +1,561 @@
+'use client'
+
+import { useEffect, useState, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
+import { Button } from '@/components/ui/Button'
+import { Input } from '@/components/ui/Input'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
+import { Badge } from '@/components/ui/Badge'
+import { useToast } from '@/components/ui/Toast'
+import { ArrowLeft, Plus, Save, Trash2, Gift, Users, Search, Edit, Flame, Cake, ToggleLeft, ToggleRight, X } from 'lucide-react'
+import { labelTipoRecompensa } from '@/lib/lealtad/helpers'
+import type { LealtadMeta, TipoRecompensa } from '@/types'
+
+const TIPOS: TipoRecompensa[] = ['porcentaje', 'monto_fijo', 'servicio_gratis', 'producto_gratis']
+const DIAS_SEMANA = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
+const TIPOS_PROMO = [
+  { value: '2x1', label: '✂️ 2×1' },
+  { value: 'descuento_porcentaje', label: '💸 Descuento %' },
+  { value: 'descuento_fijo', label: '💰 Descuento Fijo' },
+  { value: 'servicio_gratis', label: '🎁 Servicio Gratis' },
+  { value: 'cumpleanos', label: '🎂 Cumpleaños' },
+  { value: 'nivel_lealtad', label: '👑 Nivel de Lealtad' },
+]
+const NIVELES = ['BRONCE', 'PLATA', 'ORO']
+const ICONOS = ['🎁', '✂️', '💸', '💰', '🎂', '👑', '🔥', '⭐', '🎉', '🎯']
+
+const emptyMeta = {
+  nombre: '', descripcion: '', visitas_requeridas: 5,
+  tipo_recompensa: 'porcentaje' as TipoRecompensa, valor_recompensa: 20,
+  servicio_id: '' as string, producto_id: '' as string, is_active: true, orden: 0,
+}
+
+const emptyPromo = {
+  nombre: '', descripcion: '', tipo: '2x1', valor: 0,
+  dias_semana: [] as number[], servicio_id: '', nivel_requerido: '',
+  activa: true, icono: '🎁', color: 'amber', fecha_inicio: '', fecha_fin: '',
+}
+
+export default function AdminLealtadPage() {
+  const router = useRouter()
+  const { success, error: toastError } = useToast()
+  const supabase = createClient()
+
+  // Metas state
+  const [metas, setMetas] = useState<LealtadMeta[]>([])
+  const [clientes, setClientes] = useState<any[]>([])
+  const [canjes, setCanjes] = useState<any[]>([])
+  const [servicios, setServicios] = useState<{ id: string; nombre: string }[]>([])
+  const [productos, setProductos] = useState<{ id: string; nombre: string }[]>([])
+  const [filtro, setFiltro] = useState('')
+  const [metaFiltro, setMetaFiltro] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [showModal, setShowModal] = useState(false)
+  const [editing, setEditing] = useState<LealtadMeta | null>(null)
+  const [form, setForm] = useState(emptyMeta)
+
+  // Promociones state
+  const [promociones, setPromociones] = useState<any[]>([])
+  const [showPromoModal, setShowPromoModal] = useState(false)
+  const [editingPromo, setEditingPromo] = useState<any | null>(null)
+  const [promoForm, setPromoForm] = useState(emptyPromo)
+  const [savingPromo, setSavingPromo] = useState(false)
+
+  // Cumpleaños verificados hoy
+  const [verifs, setVerifs] = useState<any[]>([])
+
+  const [tab, setTab] = useState<'metas' | 'clientes' | 'promociones' | 'cumpleanos'>('metas')
+
+  const loadAll = useCallback(async () => {
+    try {
+      const params = new URLSearchParams({ filtro })
+      if (metaFiltro) params.set('meta_id', metaFiltro)
+      const [mRes, aRes, pRes, vRes] = await Promise.all([
+        fetch('/api/lealtad/metas'),
+        fetch(`/api/lealtad/admin?${params}`),
+        fetch('/api/promociones?activas=false'),
+        fetch('/api/cumpleanos'),
+      ])
+      const mJson = await mRes.json()
+      const aJson = await aRes.json()
+      const pJson = await pRes.json()
+      const vJson = await vRes.json()
+      setMetas(mJson.metas ?? [])
+      setClientes(aJson.clientes ?? [])
+      setCanjes(aJson.canjes ?? [])
+      setPromociones(pJson.promociones ?? [])
+      setVerifs(vJson.verificaciones ?? [])
+    } finally {
+      setLoading(false)
+    }
+  }, [filtro, metaFiltro])
+
+  useEffect(() => {
+    loadAll()
+    supabase.from('servicios').select('id, nombre').eq('is_active', true).then(({ data }) => { if (data) setServicios(data) })
+    supabase.from('productos').select('id, nombre').eq('is_active', true).then(({ data }) => { if (data) setProductos(data) })
+  }, [])
+
+  // ── Meta CRUD ──
+  const saveMeta = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      const payload = { ...form, servicio_id: form.servicio_id || null, producto_id: form.producto_id || null }
+      const res = await fetch('/api/lealtad/metas', {
+        method: editing ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editing ? { id: editing.id, ...payload } : payload),
+      })
+      if (!res.ok) throw new Error((await res.json()).error)
+      success(editing ? 'Meta actualizada' : 'Meta creada')
+      setShowModal(false); setEditing(null); setForm(emptyMeta); loadAll()
+    } catch (e) { toastError(e instanceof Error ? e.message : 'Error') }
+  }
+
+  const deleteMeta = async (id: string) => {
+    if (!confirm('¿Eliminar esta meta?')) return
+    await fetch(`/api/lealtad/metas?id=${id}`, { method: 'DELETE' })
+    loadAll()
+  }
+
+  const openEditMeta = (m: LealtadMeta) => {
+    setEditing(m)
+    setForm({ nombre: m.nombre, descripcion: m.descripcion || '', visitas_requeridas: m.visitas_requeridas, tipo_recompensa: m.tipo_recompensa, valor_recompensa: m.valor_recompensa, servicio_id: m.servicio_id || '', producto_id: m.producto_id || '', is_active: m.is_active, orden: m.orden })
+    setShowModal(true)
+  }
+
+  // ── Cliente CRUD ──
+  const ajustarVisitas = async (clienteId: string, delta?: number, total?: number) => {
+    await fetch('/api/lealtad/admin', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ accion: 'ajustar_visitas', cliente_id: clienteId, visitas_delta: delta, visitas_total: total }) })
+    loadAll()
+  }
+  const fijarVisitas = async (clienteId: string, actual: number) => {
+    const val = prompt('Número exacto de visitas:', String(actual))
+    if (val === null) return
+    const n = parseInt(val, 10)
+    if (Number.isNaN(n) || n < 0) { toastError('Número inválido'); return }
+    await ajustarVisitas(clienteId, undefined, n); success('Visitas actualizadas')
+  }
+  const otorgarRecompensa = async (clienteId: string) => {
+    const desc = prompt('Descripción de la recompensa:')
+    if (!desc) return
+    await fetch('/api/lealtad/admin', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ accion: 'otorgar_recompensa', cliente_id: clienteId, descripcion: desc }) })
+    success('Recompensa otorgada'); loadAll()
+  }
+
+  // ── Promo CRUD ──
+  const toggleDia = (dia: number) => {
+    setPromoForm(f => ({
+      ...f,
+      dias_semana: f.dias_semana.includes(dia) ? f.dias_semana.filter(d => d !== dia) : [...f.dias_semana, dia]
+    }))
+  }
+
+  const savePromo = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSavingPromo(true)
+    try {
+      const payload = {
+        ...promoForm,
+        servicio_id: promoForm.servicio_id || null,
+        nivel_requerido: promoForm.nivel_requerido || null,
+        fecha_inicio: promoForm.fecha_inicio || null,
+        fecha_fin: promoForm.fecha_fin || null,
+      }
+      const res = await fetch('/api/promociones', {
+        method: editingPromo ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editingPromo ? { id: editingPromo.id, ...payload } : payload),
+      })
+      if (!res.ok) throw new Error((await res.json()).error)
+      success(editingPromo ? 'Promoción actualizada' : 'Promoción creada')
+      setShowPromoModal(false); setEditingPromo(null); setPromoForm(emptyPromo); loadAll()
+    } catch (e) { toastError(e instanceof Error ? e.message : 'Error') } finally { setSavingPromo(false) }
+  }
+
+  const deletePromo = async (id: string) => {
+    if (!confirm('¿Eliminar esta promoción?')) return
+    await fetch(`/api/promociones?id=${id}`, { method: 'DELETE' })
+    loadAll()
+  }
+
+  const togglePromo = async (promo: any) => {
+    await fetch('/api/promociones', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: promo.id, activa: !promo.activa }),
+    })
+    loadAll()
+  }
+
+  const openEditPromo = (p: any) => {
+    setEditingPromo(p)
+    setPromoForm({ nombre: p.nombre, descripcion: p.descripcion || '', tipo: p.tipo, valor: p.valor ?? 0, dias_semana: p.dias_semana ?? [], servicio_id: p.servicio_id || '', nivel_requerido: p.nivel_requerido || '', activa: p.activa, icono: p.icono || '🎁', color: p.color || 'amber', fecha_inicio: p.fecha_inicio || '', fecha_fin: p.fecha_fin || '' })
+    setShowPromoModal(true)
+  }
+
+  if (loading) {
+    return <div className="flex flex-col items-center justify-center h-96"><div className="w-12 h-12 border-4 border-zinc-700 border-t-amber-500 rounded-full animate-spin" /></div>
+  }
+
+  return (
+    <div className="space-y-8 pb-20">
+      <div className="flex flex-col md:flex-row justify-between items-end gap-4 border-b border-white/5 pb-8">
+        <div className="flex items-center gap-6">
+          <button onClick={() => router.push('/admin')} className="p-4 hover:bg-white/5 border border-white/5 bg-zinc-950 rounded-2xl">
+            <ArrowLeft className="w-5 h-5 text-zinc-500" />
+          </button>
+          <div>
+            <h1 className="text-4xl font-black text-white uppercase">Programa de <span className="text-amber-500">Lealtad</span></h1>
+            <p className="text-zinc-500 mt-2">Metas, recompensas, promociones y cumpleaños</p>
+          </div>
+        </div>
+        {tab === 'metas' && (
+          <Button variant="primary" onClick={() => { setEditing(null); setForm(emptyMeta); setShowModal(true) }}>
+            <Plus className="w-4 h-4 mr-2" /> Nueva Meta
+          </Button>
+        )}
+        {tab === 'promociones' && (
+          <Button variant="primary" onClick={() => { setEditingPromo(null); setPromoForm(emptyPromo); setShowPromoModal(true) }}>
+            <Plus className="w-4 h-4 mr-2" /> Nueva Promo
+          </Button>
+        )}
+      </div>
+
+      {/* Tabs */}
+      <div className="flex flex-wrap gap-2">
+        {[
+          { key: 'metas', label: 'Metas', icon: Gift },
+          { key: 'clientes', label: 'Clientes', icon: Users },
+          { key: 'promociones', label: 'Promociones', icon: Flame },
+          { key: 'cumpleanos', label: `Cumpleaños Hoy (${verifs.length})`, icon: Cake },
+        ].map(({ key, label, icon: Icon }) => (
+          <Button key={key} variant={tab === key ? 'primary' : 'outline'} onClick={() => setTab(key as any)}>
+            <Icon className="w-4 h-4 mr-2" /> {label}
+          </Button>
+        ))}
+      </div>
+
+      {/* ══ METAS ══ */}
+      {tab === 'metas' && (
+        <div className="grid gap-4">
+          {metas.length === 0 && <p className="text-zinc-600 text-center py-12 font-black uppercase tracking-widest">No hay metas configuradas</p>}
+          {metas.map((m) => (
+            <Card key={m.id} className="bg-zinc-900 border-white/5">
+              <CardContent className="p-6 flex flex-col md:flex-row justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-3 mb-2">
+                    <Badge variant={m.is_active ? 'success' : 'default'}>{m.is_active ? 'Activa' : 'Inactiva'}</Badge>
+                    <span className="text-amber-500 font-black text-2xl">{m.visitas_requeridas}</span>
+                    <span className="text-zinc-500 text-sm uppercase font-bold">visitas</span>
+                  </div>
+                  <h3 className="text-xl font-black text-white uppercase">{m.nombre}</h3>
+                  <p className="text-zinc-400 text-sm mt-1">{m.descripcion}</p>
+                  <p className="text-xs text-zinc-600 mt-2 uppercase font-bold">
+                    {labelTipoRecompensa(m.tipo_recompensa)}
+                    {m.tipo_recompensa === 'porcentaje' && ` — ${m.valor_recompensa}%`}
+                    {m.tipo_recompensa === 'monto_fijo' && ` — Bs. ${m.valor_recompensa}`}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => openEditMeta(m)}><Edit className="w-4 h-4" /></Button>
+                  <Button variant="outline" size="sm" onClick={() => deleteMeta(m.id)}><Trash2 className="w-4 h-4 text-red-500" /></Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* ══ CLIENTES ══ */}
+      {tab === 'clientes' && (
+        <>
+          <div className="flex flex-wrap gap-2">
+            <Input placeholder="Buscar cliente..." value={filtro} onChange={(e) => setFiltro(e.target.value)} className="max-w-md" />
+            <select className="h-12 bg-zinc-950 border border-white/10 rounded-xl px-4 text-white text-sm" value={metaFiltro} onChange={(e) => setMetaFiltro(e.target.value)}>
+              <option value="">Todas las metas</option>
+              {metas.map((m) => <option key={m.id} value={m.id}>{m.nombre} ({m.visitas_requeridas}+ visitas)</option>)}
+            </select>
+            <Button variant="outline" onClick={loadAll}><Search className="w-4 h-4" /></Button>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-zinc-500 uppercase text-[10px] tracking-widest border-b border-white/5">
+                  <th className="text-left py-3 px-4">Cliente</th>
+                  <th className="text-left py-3 px-4">Nivel</th>
+                  <th className="text-left py-3 px-4">Visitas</th>
+                  <th className="text-left py-3 px-4">Gastado</th>
+                  <th className="text-right py-3 px-4">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {clientes.map((c) => (
+                  <tr key={c.id} className="border-b border-white/5 hover:bg-white/5">
+                    <td className="py-4 px-4 font-bold text-white">{c.nombre}</td>
+                    <td className="py-4 px-4">
+                      <Badge variant={c.nivel_fidelidad === 'ORO' ? 'warning' : 'default'} className="text-[10px] uppercase font-black">{c.nivel_fidelidad ?? 'BRONCE'}</Badge>
+                    </td>
+                    <td className="py-4 px-4 text-amber-500 font-black text-lg">{c.total_visitas ?? 0}</td>
+                    <td className="py-4 px-4 text-zinc-400">Bs. {c.total_gastado ?? 0}</td>
+                    <td className="py-4 px-4 text-right space-x-1">
+                      <Button variant="outline" size="sm" onClick={() => ajustarVisitas(c.id, 1)}>+1</Button>
+                      <Button variant="outline" size="sm" onClick={() => ajustarVisitas(c.id, -1)}>-1</Button>
+                      <Button variant="outline" size="sm" onClick={() => fijarVisitas(c.id, c.total_visitas ?? 0)}>Fijar</Button>
+                      <Button variant="primary" size="sm" onClick={() => otorgarRecompensa(c.id)}>Premio</Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {canjes.length > 0 && (
+            <Card className="bg-zinc-900 border-white/5 mt-8">
+              <CardHeader><CardTitle className="text-white uppercase text-sm">Historial de Canjes</CardTitle></CardHeader>
+              <CardContent className="space-y-2 max-h-72 overflow-y-auto">
+                {canjes.map((c: any) => (
+                  <div key={c.id} className="flex justify-between text-sm border-b border-white/5 py-2">
+                    <span className="text-zinc-300">{c.clientes?.nombre} — {c.descripcion}</span>
+                    <span className="text-zinc-600 text-xs">{new Date(c.canjeado_at).toLocaleDateString('es-BO')}</span>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+        </>
+      )}
+
+      {/* ══ PROMOCIONES ══ */}
+      {tab === 'promociones' && (
+        <div className="space-y-4">
+          {promociones.length === 0 && <p className="text-zinc-600 text-center py-12 font-black uppercase tracking-widest">No hay promociones. Crea la primera.</p>}
+          {promociones.map((p) => (
+            <Card key={p.id} className={`border transition-all ${p.activa ? 'border-amber-500/20 bg-zinc-900' : 'border-white/5 bg-zinc-900/40 opacity-60'}`}>
+              <CardContent className="p-5 flex flex-col md:flex-row justify-between items-start gap-4">
+                <div className="flex items-start gap-4">
+                  <span className="text-3xl">{p.icono}</span>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <h3 className="font-black text-white uppercase">{p.nombre}</h3>
+                      <Badge variant={p.activa ? 'success' : 'default'} className="text-[9px] uppercase">{p.activa ? 'Activa' : 'Pausada'}</Badge>
+                      <Badge variant="info" className="text-[9px] uppercase">{TIPOS_PROMO.find(t => t.value === p.tipo)?.label ?? p.tipo}</Badge>
+                    </div>
+                    {p.descripcion && <p className="text-zinc-400 text-sm">{p.descripcion}</p>}
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {p.dias_semana?.length > 0
+                        ? p.dias_semana.map((d: number) => <span key={d} className="text-[10px] font-black text-amber-500 bg-amber-500/10 border border-amber-500/20 rounded-lg px-2 py-0.5 uppercase">{DIAS_SEMANA[d]}</span>)
+                        : <span className="text-[10px] text-zinc-600 uppercase font-black">Todos los días</span>
+                      }
+                      {p.nivel_requerido && <span className="text-[10px] font-black text-purple-400 bg-purple-500/10 border border-purple-500/20 rounded-lg px-2 py-0.5 uppercase">Nivel {p.nivel_requerido}+</span>}
+                      {p.valor > 0 && <span className="text-[10px] font-black text-green-400 bg-green-500/10 border border-green-500/20 rounded-lg px-2 py-0.5">{p.tipo === 'descuento_porcentaje' ? `${p.valor}%` : `Bs ${p.valor}`} OFF</span>}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <button onClick={() => togglePromo(p)} className="p-2 rounded-xl hover:bg-white/5 transition-colors text-zinc-400 hover:text-white" title={p.activa ? 'Pausar' : 'Activar'}>
+                    {p.activa ? <ToggleRight size={20} className="text-green-500" /> : <ToggleLeft size={20} />}
+                  </button>
+                  <Button variant="outline" size="sm" onClick={() => openEditPromo(p)}><Edit className="w-4 h-4" /></Button>
+                  <Button variant="outline" size="sm" onClick={() => deletePromo(p.id)}><Trash2 className="w-4 h-4 text-red-500" /></Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* ══ CUMPLEAÑOS HOY ══ */}
+      {tab === 'cumpleanos' && (
+        <div className="space-y-4">
+          <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 flex items-center gap-3">
+            <span className="text-2xl">🎂</span>
+            <div>
+              <p className="text-amber-400 font-black uppercase text-sm">Verificados Hoy</p>
+              <p className="text-zinc-400 text-xs">Clientes que presentaron documento para recibir su regalo de cumpleaños</p>
+            </div>
+          </div>
+          {verifs.length === 0 ? (
+            <div className="text-center py-16 border-2 border-dashed border-white/5 rounded-3xl">
+              <span className="text-5xl">🎂</span>
+              <p className="text-zinc-600 font-black uppercase tracking-widest mt-4">Sin cumpleaños verificados hoy</p>
+            </div>
+          ) : (
+            verifs.map((v: any) => (
+              <Card key={v.id} className="border-amber-500/20 bg-zinc-900">
+                <CardContent className="p-5 flex items-center gap-5">
+                  {v.foto_documento_url && (
+                    <img src={v.foto_documento_url} alt="Documento" className="w-16 h-12 object-cover rounded-xl border border-white/10" />
+                  )}
+                  <div className="flex-1">
+                    <p className="font-black text-white">{v.cliente?.nombre}</p>
+                    <p className="text-zinc-500 text-xs uppercase font-bold mt-0.5">
+                      {v.tipo_documento} · Verificado a las {new Date(v.created_at).toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                    {v.promo?.nombre && <p className="text-amber-400 text-xs mt-1">🎁 Promo: {v.promo.nombre}</p>}
+                    {v.notas && <p className="text-zinc-600 text-xs mt-1">{v.notas}</p>}
+                  </div>
+                  <span className="text-2xl">🎂</span>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* ══ MODAL META ══ */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-[100] p-4 overflow-y-auto">
+          <Card className="w-full max-w-lg bg-zinc-950 border-white/10 my-auto">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-white uppercase">{editing ? 'Editar Meta' : 'Nueva Meta'}</CardTitle>
+                <button onClick={() => setShowModal(false)} className="p-2 hover:bg-white/10 rounded-lg"><X size={16} className="text-zinc-400" /></button>
+              </div>
+            </CardHeader>
+            <form onSubmit={saveMeta}>
+              <CardContent className="space-y-4 p-6">
+                <Input label="Nombre" required value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} />
+                <Input label="Descripción" value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })} />
+                <Input label="Visitas requeridas" type="number" min={1} value={form.visitas_requeridas} onChange={(e) => setForm({ ...form, visitas_requeridas: parseInt(e.target.value) })} />
+                <Input label="Orden" type="number" value={form.orden} onChange={(e) => setForm({ ...form, orden: parseInt(e.target.value) || 0 })} />
+                <div>
+                  <label className="text-[10px] font-black uppercase text-zinc-500">Tipo de recompensa</label>
+                  <select className="w-full h-12 mt-1 bg-zinc-900 border border-white/10 rounded-xl px-4 text-white" value={form.tipo_recompensa} onChange={(e) => setForm({ ...form, tipo_recompensa: e.target.value as TipoRecompensa })}>
+                    {TIPOS.map((t) => <option key={t} value={t}>{labelTipoRecompensa(t)}</option>)}
+                  </select>
+                </div>
+                {(form.tipo_recompensa === 'porcentaje' || form.tipo_recompensa === 'monto_fijo') && (
+                  <Input label="Valor" type="number" value={form.valor_recompensa} onChange={(e) => setForm({ ...form, valor_recompensa: parseFloat(e.target.value) })} />
+                )}
+                {form.tipo_recompensa === 'servicio_gratis' && (
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-zinc-500">Servicio gratis</label>
+                    <select className="w-full h-12 mt-1 bg-zinc-900 border border-white/10 rounded-xl px-4 text-white" value={form.servicio_id} onChange={(e) => setForm({ ...form, servicio_id: e.target.value })}>
+                      <option value="">Cualquier servicio</option>
+                      {servicios.map((s) => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+                    </select>
+                  </div>
+                )}
+                {form.tipo_recompensa === 'producto_gratis' && (
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-zinc-500">Producto gratis</label>
+                    <select className="w-full h-12 mt-1 bg-zinc-900 border border-white/10 rounded-xl px-4 text-white" value={form.producto_id} onChange={(e) => setForm({ ...form, producto_id: e.target.value })}>
+                      <option value="">Seleccionar producto</option>
+                      {productos.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+                    </select>
+                  </div>
+                )}
+                <label className="flex items-center gap-2 text-sm text-zinc-400">
+                  <input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} /> Meta activa
+                </label>
+              </CardContent>
+              <div className="p-6 border-t border-white/5 flex gap-3">
+                <Button type="button" variant="outline" className="flex-1" onClick={() => setShowModal(false)}>Cancelar</Button>
+                <Button type="submit" variant="primary" className="flex-1"><Save className="w-4 h-4 mr-2" />Guardar</Button>
+              </div>
+            </form>
+          </Card>
+        </div>
+      )}
+
+      {/* ══ MODAL PROMO ══ */}
+      {showPromoModal && (
+        <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-[100] p-4 overflow-y-auto">
+          <Card className="w-full max-w-xl bg-zinc-950 border-white/10 my-auto">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-white uppercase">{editingPromo ? 'Editar Promoción' : 'Nueva Promoción'}</CardTitle>
+                <button onClick={() => setShowPromoModal(false)} className="p-2 hover:bg-white/10 rounded-lg"><X size={16} className="text-zinc-400" /></button>
+              </div>
+            </CardHeader>
+            <form onSubmit={savePromo}>
+              <CardContent className="space-y-4 p-6">
+                {/* Nombre + Ícono */}
+                <div className="grid grid-cols-4 gap-3">
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-zinc-500 mb-1 block">Ícono</label>
+                    <select className="w-full h-11 bg-zinc-900 border border-white/10 rounded-xl px-3 text-white text-lg" value={promoForm.icono} onChange={e => setPromoForm({ ...promoForm, icono: e.target.value })}>
+                      {ICONOS.map(i => <option key={i} value={i}>{i}</option>)}
+                    </select>
+                  </div>
+                  <div className="col-span-3">
+                    <Input label="Nombre" required value={promoForm.nombre} onChange={e => setPromoForm({ ...promoForm, nombre: e.target.value })} />
+                  </div>
+                </div>
+
+                <Input label="Descripción" value={promoForm.descripcion} onChange={e => setPromoForm({ ...promoForm, descripcion: e.target.value })} />
+
+                {/* Tipo */}
+                <div>
+                  <label className="text-[10px] font-black uppercase text-zinc-500 mb-1 block">Tipo de Promoción</label>
+                  <select className="w-full h-11 bg-zinc-900 border border-white/10 rounded-xl px-4 text-white" value={promoForm.tipo} onChange={e => setPromoForm({ ...promoForm, tipo: e.target.value })}>
+                    {TIPOS_PROMO.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                  </select>
+                </div>
+
+                {/* Valor (solo si aplica) */}
+                {['descuento_porcentaje', 'descuento_fijo'].includes(promoForm.tipo) && (
+                  <Input label={promoForm.tipo === 'descuento_porcentaje' ? 'Descuento (%)' : 'Descuento fijo (Bs)'} type="number" min={0} value={promoForm.valor} onChange={e => setPromoForm({ ...promoForm, valor: parseFloat(e.target.value) || 0 })} />
+                )}
+
+                {/* Días de la semana */}
+                <div>
+                  <label className="text-[10px] font-black uppercase text-zinc-500 mb-2 block">Días de la semana (vacío = todos)</label>
+                  <div className="flex gap-2 flex-wrap">
+                    {DIAS_SEMANA.map((dia, i) => (
+                      <button key={i} type="button"
+                        className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase transition-all ${promoForm.dias_semana.includes(i) ? 'bg-amber-500 text-black' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'}`}
+                        onClick={() => toggleDia(i)}
+                      >{dia}</button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Nivel requerido */}
+                {promoForm.tipo === 'nivel_lealtad' && (
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-zinc-500 mb-1 block">Nivel mínimo requerido</label>
+                    <select className="w-full h-11 bg-zinc-900 border border-white/10 rounded-xl px-4 text-white" value={promoForm.nivel_requerido} onChange={e => setPromoForm({ ...promoForm, nivel_requerido: e.target.value })}>
+                      <option value="">Todos los niveles</option>
+                      {NIVELES.map(n => <option key={n} value={n}>{n}</option>)}
+                    </select>
+                  </div>
+                )}
+
+                {/* Servicio asociado */}
+                <div>
+                  <label className="text-[10px] font-black uppercase text-zinc-500 mb-1 block">Servicio (opcional)</label>
+                  <select className="w-full h-11 bg-zinc-900 border border-white/10 rounded-xl px-4 text-white" value={promoForm.servicio_id} onChange={e => setPromoForm({ ...promoForm, servicio_id: e.target.value })}>
+                    <option value="">Todos los servicios</option>
+                    {servicios.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+                  </select>
+                </div>
+
+                {/* Vigencia */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-zinc-500 mb-1 block">Desde (opcional)</label>
+                    <input type="date" value={promoForm.fecha_inicio} onChange={e => setPromoForm({ ...promoForm, fecha_inicio: e.target.value })} className="w-full h-11 bg-zinc-900 border border-white/10 rounded-xl px-4 text-white text-sm outline-none focus:border-amber-500/50" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-zinc-500 mb-1 block">Hasta (opcional)</label>
+                    <input type="date" value={promoForm.fecha_fin} onChange={e => setPromoForm({ ...promoForm, fecha_fin: e.target.value })} className="w-full h-11 bg-zinc-900 border border-white/10 rounded-xl px-4 text-white text-sm outline-none focus:border-amber-500/50" />
+                  </div>
+                </div>
+
+                <label className="flex items-center gap-2 text-sm text-zinc-400">
+                  <input type="checkbox" checked={promoForm.activa} onChange={e => setPromoForm({ ...promoForm, activa: e.target.checked })} /> Promoción activa
+                </label>
+              </CardContent>
+              <div className="p-6 border-t border-white/5 flex gap-3">
+                <Button type="button" variant="outline" className="flex-1" onClick={() => setShowPromoModal(false)}>Cancelar</Button>
+                <Button type="submit" variant="primary" className="flex-1" disabled={savingPromo}><Save className="w-4 h-4 mr-2" />{savingPromo ? 'Guardando...' : 'Guardar'}</Button>
+              </div>
+            </form>
+          </Card>
+        </div>
+      )}
+    </div>
+  )
+}

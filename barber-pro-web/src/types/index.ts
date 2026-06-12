@@ -1,17 +1,20 @@
 // Tipos principales para Barber Pro Web
 
-export type Role = 'admin' | 'recepcionista' | 'barbero' | 'cliente'
+export type Role = 'admin' | 'coordinador' | 'barbero' | 'cliente'
 
 export interface Profile {
   id: string
   email: string
   full_name: string | null
   phone: string | null
+  ci: string | null
   role: Role
   is_active: boolean
   comision_porcentaje: number
   created_at: string
 }
+
+export type ComisionTipo = 'porcentaje' | 'fija' | 'ninguna' | 'global'
 
 export interface Servicio {
   id: string
@@ -21,15 +24,21 @@ export interface Servicio {
   duracion_minutos: number
   color: string
   is_active: boolean
+  comision_activa?: boolean
+  comision_tipo?: ComisionTipo
+  comision_valor?: number
+  comision_acumulable?: boolean
 }
 
 export interface Cliente {
   id: string
   nombre: string
+  ci: string | null
   telefono: string | null
   email: string | null
   cumpleanos: string | null
   notas: string | null
+  nivel_fidelidad: 'BRONCE' | 'PLATA' | 'ORO'
   total_visitas: number
   total_gastado: number
   ultima_visita: string | null
@@ -78,4 +87,149 @@ export interface Asistencia {
   notas: string | null
   created_at: string
   profile?: Profile
+}
+
+// =============================================
+// Horarios
+// =============================================
+
+export type TipoHorario = 'manana' | 'tarde' | 'todo_dia' | 'medio_turno' | 'especial' | 'personalizado'
+
+export interface PlantillaHorario {
+  id: string
+  nombre: string
+  tipo: TipoHorario
+  hora_inicio: string
+  hora_fin: string
+  descripcion?: string
+  is_active: boolean
+}
+
+// =============================================
+// Lealtad
+// =============================================
+
+export type TipoRecompensa = 'porcentaje' | 'monto_fijo' | 'servicio_gratis' | 'producto_gratis'
+
+export interface LealtadMeta {
+  id: string
+  nombre: string
+  descripcion: string
+  visitas_requeridas: number
+  tipo_recompensa: TipoRecompensa
+  valor_recompensa: number
+  servicio_id: string | null
+  producto_id: string | null
+  is_active: boolean
+  orden: number
+}
+
+// =============================================
+// Tipos del ERP Contable
+// =============================================
+
+export type Libro = 'CAJA_CHICA' | 'VENTAS' | 'SERVICIOS' | 'BANCO'
+
+export type TipoMovimiento =
+  | 'PAGO_CLIENTE'
+  | 'SANCCION'
+  | 'ADELANTO'
+  | 'DEPOSITO'
+  | 'VENTA_PRODUCTO'
+  | 'APORTE_CAPITAL'
+  | 'RETIRO'
+  | 'AJUSTE'
+  | 'EGRESO'
+
+export interface PlanCuenta {
+  id: string
+  codigo: string
+  detalle: string
+  tipo: 'ACTIVO' | 'PASIVO' | 'PATRIMONIO' | 'INGRESO' | 'EGRESO'
+  nivel: number
+  es_sancion: boolean
+}
+
+export interface Transaction {
+  id: string
+  libro: Libro
+  fecha: string
+  ci: string
+  nombre: string
+  cuenta_codigo: string
+  cuenta_detalle: string
+  glosa: string
+  costo: number
+  tipo_movimiento: TipoMovimiento
+  es_sancion: boolean
+  empleado_id: string | null
+  cliente_id: string | null
+  usuario_registro: string
+  notas: string | null
+  creado_en: string
+}
+
+export interface DailyClosure {
+  id: string
+  fecha: string
+  caja_chica: number
+  ventas: number
+  servicios: number
+  banco: number
+  total_registrado: number
+  total_efectivo_fisico: number
+  total_qr: number
+  diferencia: number
+  observaciones: string | null
+  usuario_cierre: string
+  cerrado: boolean
+}
+
+export interface Bono {
+  id: string
+  barbero_id: string
+  tipo: 'puntualidad' | 'cantidad_servicios' | 'metas' | 'otro'
+  descripcion: string | null
+  monto: number
+  mes: number
+  anio: number
+  pagado: boolean
+  pagado_at?: string
+  creado_en?: string
+}
+
+export interface CatalogoSancion {
+  id: string
+  codigo: string
+  nombre: string
+  descripcion: string | null
+  monto_sugerido: number
+  is_active: boolean
+  created_at: string
+}
+
+export interface CatalogoBono {
+  id: string
+  codigo: string
+  nombre: string
+  descripcion: string | null
+  monto_sugerido: number
+  is_active: boolean
+  created_at: string
+}
+
+export interface Egreso {
+  id: string
+  fecha: string
+  concepto: string
+  proveedor: string | null
+  monto_bruto: number
+  tiene_factura: boolean
+  iva: number
+  it: number
+  monto_neto: number
+  numero_factura: string | null
+  cuenta_codigo: string | null
+  usuario_registro: string
+  notas: string | null
 }

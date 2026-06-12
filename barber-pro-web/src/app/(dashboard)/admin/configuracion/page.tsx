@@ -1,0 +1,239 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { createClient } from '@/lib/supabase/client'
+import { Button } from '@/components/ui/Button'
+import { Input } from '@/components/ui/Input'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
+import { useToast } from '@/components/ui/Toast'
+import { QrCode, Save, ArrowLeft, Image as ImageIcon } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { isValidImageUrl } from '@/lib/validators'
+
+export default function AdminConfiguracionPage() {
+  const [qrUrl, setQrUrl] = useState('')
+  const [initialQrUrl, setInitialQrUrl] = useState('')
+  const [heroBgUrl, setHeroBgUrl] = useState('')
+  const [initialHeroBgUrl, setInitialHeroBgUrl] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const { error: toastError, success: toastSuccess, toast: toastInfo } = useToast()
+  const supabase = createClient()
+  const router = useRouter()
+
+  useEffect(() => {
+    const loadConfig = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('configuraciones')
+          .select('llave, valor')
+          .in('llave', ['qr_pago', 'hero_bg_image'])
+
+        if (data) {
+          const qrConfig = data.find(c => c.llave === 'qr_pago')
+          const heroConfig = data.find(c => c.llave === 'hero_bg_image')
+          if (qrConfig && qrConfig.valor?.url) {
+            setQrUrl(qrConfig.valor.url)
+            setInitialQrUrl(qrConfig.valor.url)
+          }
+          if (heroConfig && heroConfig.valor?.url) {
+            setHeroBgUrl(heroConfig.valor.url)
+            setInitialHeroBgUrl(heroConfig.valor.url)
+          }
+        }
+      } catch (err) {
+        console.error(err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadConfig()
+  }, [supabase])
+
+  const handleSaveQr = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    const trimmedUrl = qrUrl.trim()
+    if (!trimmedUrl) {
+      return toastError('El enlace no puede estar vacío.')
+    }
+    if (trimmedUrl === initialQrUrl) {
+      return toastInfo('No se han hecho cambios, la URL es la misma.')
+    }
+    if (!isValidImageUrl(trimmedUrl)) {
+      return toastError('La URL proporcionada no parece ser una imagen válida.')
+    }
+
+    setSaving(true)
+    try {
+      const { error } = await supabase
+        .from('configuraciones')
+        .upsert({
+          llave: 'qr_pago',
+          valor: { url: qrUrl.trim() },
+          descripcion: 'URL de la imagen del QR para pagos'
+        }, { onConflict: 'llave' })
+
+      if (error) throw error
+      setInitialQrUrl(trimmedUrl)
+      toastSuccess('Código QR actualizado correctamente')
+    } catch (err: any) {
+      toastError(err.message || 'Error al guardar la configuración del QR')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleSaveHero = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    const trimmedUrl = heroBgUrl.trim()
+    if (!trimmedUrl) {
+      return toastError('El enlace del fondo no puede estar vacío.')
+    }
+    if (trimmedUrl === initialHeroBgUrl) {
+      return toastInfo('No se han hecho cambios, la URL es la misma.')
+    }
+    if (!isValidImageUrl(trimmedUrl)) {
+      return toastError('La URL del fondo proporcionada no es una imagen válida.')
+    }
+
+    setSaving(true)
+    try {
+      const { error } = await supabase
+        .from('configuraciones')
+        .upsert({
+          llave: 'hero_bg_image',
+          valor: { url: heroBgUrl.trim() },
+          descripcion: 'URL de la imagen de fondo principal (Hero)'
+        }, { onConflict: 'llave' })
+
+      if (error) throw error
+      setInitialHeroBgUrl(trimmedUrl)
+      toastSuccess('Imagen de fondo actualizada correctamente')
+    } catch (err: any) {
+      toastError(err.message || 'Error al guardar el fondo')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-96">
+        <div className="w-12 h-12 border-4 border-zinc-700 border-t-amber-500 rounded-full animate-spin mb-4"></div>
+        <p className="text-zinc-500 font-bold uppercase tracking-widest text-xs">Cargando...</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in duration-500 pb-24">
+      <div className="flex items-center gap-6 border-b border-white/5 pb-8">
+        <button onClick={() => router.back()} className="p-4 hover:bg-white/5 border border-white/5 bg-zinc-950 rounded-2xl transition-all btn-press group">
+          <ArrowLeft className="w-5 h-5 text-zinc-500 group-hover:text-amber-500" />
+        </button>
+        <div>
+          <h1 className="text-4xl font-black tracking-tight text-white uppercase leading-none">
+            Ajustes <span className="text-amber-500">Globales</span>
+          </h1>
+          <p className="text-zinc-500 font-medium mt-2 text-lg">Configuraciones del sistema</p>
+        </div>
+      </div>
+
+      <Card className="bg-zinc-900 border-white/5">
+        <CardHeader className="border-b border-white/5 bg-zinc-900/50 p-6">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-amber-500/10 rounded-xl flex items-center justify-center text-amber-500">
+              <ImageIcon className="w-6 h-6" />
+            </div>
+            <div>
+              <CardTitle className="text-xl font-black uppercase text-white">Fondo del Inicio (Hero)</CardTitle>
+              <p className="text-sm text-zinc-400">Imagen principal de la pantalla de inicio ("Estilo Clásico Moderno").</p>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-6">
+          <form onSubmit={handleSaveHero} className="space-y-6">
+            <div>
+              <Input
+                label="URL de la imagen de fondo"
+                placeholder="https://..."
+                value={heroBgUrl}
+                onChange={(e) => setHeroBgUrl(e.target.value)}
+                className="bg-zinc-950"
+              />
+              <p className="text-xs text-amber-400 mt-2 font-medium">Sugerencia: Usa una imagen en formato horizontal de alta calidad. Recomendado: 1920x1080px o superior.</p>
+            </div>
+
+            {heroBgUrl && isValidImageUrl(heroBgUrl) ? (
+              <div className="mt-4 p-4 border border-white/5 rounded-2xl bg-zinc-950 flex flex-col items-center justify-center gap-4">
+                <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Vista Previa</p>
+                <img src={heroBgUrl} alt="Hero Preview" className="w-full max-w-sm rounded-xl shadow-lg border border-white/10 object-cover aspect-video" />
+              </div>
+            ) : heroBgUrl ? (
+              <p className="text-sm text-red-400 mt-2">No parece una URL de imagen válida.</p>
+            ) : null}
+
+            <Button
+              type="submit"
+              variant="primary"
+              className="w-full h-14 shadow-lg font-black uppercase tracking-widest"
+              disabled={saving}
+            >
+              <Save className="w-5 h-5 mr-2" />
+              {saving ? 'Guardando...' : 'Guardar Fondo'}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card className="bg-zinc-900 border-white/5">
+        <CardHeader className="border-b border-white/5 bg-zinc-900/50 p-6">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-amber-500/10 rounded-xl flex items-center justify-center text-amber-500">
+              <QrCode className="w-6 h-6" />
+            </div>
+            <div>
+              <CardTitle className="text-xl font-black uppercase text-white">Código QR de Pagos</CardTitle>
+              <p className="text-sm text-zinc-400">URL de la imagen del QR de tu cuenta bancaria o billetera móvil.</p>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-6">
+          <form onSubmit={handleSaveQr} className="space-y-6">
+            <div>
+              <Input
+                label="URL de la imagen del QR"
+                placeholder="https://..."
+                value={qrUrl}
+                onChange={(e) => setQrUrl(e.target.value)}
+                className="bg-zinc-950"
+              />
+              <p className="text-xs text-amber-400 mt-2 font-medium">Sugerencia: Usa una imagen cuadrada y clara del código QR. Recomendado: 500x500px, formato cuadrado.</p>
+            </div>
+
+            {qrUrl && isValidImageUrl(qrUrl) ? (
+              <div className="mt-4 p-4 border border-white/5 rounded-2xl bg-zinc-950 flex flex-col items-center justify-center gap-4">
+                <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Vista Previa</p>
+                <img src={qrUrl} alt="QR Preview" className="max-w-xs rounded-xl shadow-lg border border-white/10" />
+              </div>
+            ) : qrUrl ? (
+              <p className="text-sm text-red-400 mt-2">No parece una URL de imagen válida.</p>
+            ) : null}
+
+            <Button
+              type="submit"
+              variant="primary"
+              className="w-full h-14 shadow-lg font-black uppercase tracking-widest"
+              disabled={saving}
+            >
+              <Save className="w-5 h-5 mr-2" />
+              {saving ? 'Guardando...' : 'Guardar QR'}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}

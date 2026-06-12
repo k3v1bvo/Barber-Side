@@ -49,6 +49,7 @@ function ReservarContent() {
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
   const [user, setUser] = useState<UserProfile | null>(null)
+  const [qrPago, setQrPago] = useState<string | null>(null)
 
   const [formData, setFormData] = useState({
     servicio_id: '',
@@ -153,6 +154,17 @@ function ReservarContent() {
         .eq('role', 'barbero')
         .eq('is_active', true)
 
+      // Cargar configuracion de QR
+      const { data: configData } = await supabase
+        .from('configuraciones')
+        .select('valor')
+        .eq('llave', 'qr_pago')
+        .maybeSingle()
+      
+      if (configData?.valor) {
+        setQrPago(configData.valor)
+      }
+
       setServicios(serviciosData || [])
       setBarberos(barberosData || [])
     } catch (error) {
@@ -235,6 +247,7 @@ function ReservarContent() {
       notasFinales = formData.notas ? `${formData.notas}\n${promoNota}` : promoNota
     }
 
+    const anticipoCalculado = Math.max(20, precioFinal * 0.5)
     const barbero = barberos.find((b) => b.id === formData.barbero_id)
 
     const { data: citaNueva, error: citaError } = await supabase
@@ -246,8 +259,9 @@ function ReservarContent() {
         fecha_hora: fechaHora,
         precio: precioFinal,
         duracion_real_minutos: servicio?.duracion_minutos || 30,
-        estado: 'pendiente',
+        estado: 'pendiente_pago',
         notas: notasFinales,
+        anticipo_monto: anticipoCalculado,
       })
       .select('id')
       .single()
@@ -262,7 +276,7 @@ function ReservarContent() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          event: 'reserva_nueva',
+          event: 'pago_pendiente',
           allowPublic: true,
           payload: {
             citaId: citaNueva.id,
@@ -274,6 +288,7 @@ function ReservarContent() {
             servicioNombre: servicio?.nombre,
             fecha: formData.fecha,
             hora: formData.hora,
+            monto: anticipoCalculado,
           },
         }),
       })
@@ -304,15 +319,31 @@ function ReservarContent() {
     return horarios
   }
 
-  const hoy = new Date().toISOString().split('T')[0]
+  // Usar hora local para evitar problemas con UTC a fin de día
+  const hoyLocal = new Date()
+  const hoy = new Date(hoyLocal.getTime() - (hoyLocal.getTimezoneOffset() * 60000)).toISOString().split('T')[0]
 
   const checkDisponibilidad = (hora: string) => {
     if (!servicioSeleccionado) return false
+
+    const [hrs, mins] = hora.split(':').map(Number)
     
+    // Restricción de 3 horas mínimo si es hoy
+    if (formData.fecha === hoy) {
+      const ahora = new Date()
+      const horaCita = new Date()
+      horaCita.setHours(hrs, mins, 0, 0)
+      
+      const diffHoras = (horaCita.getTime() - ahora.getTime()) / (1000 * 60 * 60)
+      if (diffHoras < 3) {
+        return true // Bloqueado por anticipación
+      }
+    }
+
     // Convertir horas a minutos desde las 00:00 para facilitar comparación
     const getMinutos = (h: string) => {
-      const [hrs, mins] = h.split(':').map(Number)
-      return hrs * 60 + mins
+      const [hs, ms] = h.split(':').map(Number)
+      return hs * 60 + ms
     }
 
     const slotInicio = getMinutos(hora)
@@ -345,11 +376,11 @@ function ReservarContent() {
           </div>
 
           <h2 className="text-3xl font-bold mb-3 text-amber-400">
-            ¡Reserva Confirmada!
+            ¡Pago Pendiente de Verificación!
           </h2>
 
           <p className="text-zinc-400 mb-8">
-            Tu cita ha sido agendada correctamente.
+            Hemos registrado tu reserva. Quedará confirmada una vez verifiquemos tu pago QR.
           </p>
 
           <Button
@@ -367,9 +398,18 @@ function ReservarContent() {
     <div className="min-h-screen bg-gradient-to-b from-zinc-950 via-zinc-900 to-black py-16 px-4 text-white">
       <div className="max-w-3xl mx-auto">
 
-        <h1 className="text-4xl font-bold text-center mb-12 bg-gradient-to-r from-amber-400 to-yellow-500 bg-clip-text text-transparent">
-          Reservar Cita
-        </h1>
+        <div className="relative mb-12 flex flex-col md:flex-row items-center justify-center">
+          <Button
+            variant="outline"
+            className="md:absolute left-0 mb-6 md:mb-0 border-white/10 text-zinc-400 hover:text-white bg-zinc-900/50"
+            onClick={() => router.push('/')}
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" /> Cancelar
+          </Button>
+          <h1 className="text-4xl font-bold text-center bg-gradient-to-r from-amber-400 to-yellow-500 bg-clip-text text-transparent">
+            Reservar Cita
+          </h1>
+        </div>
 
         {/* Usuario logueado */}
         {user && (
@@ -382,7 +422,7 @@ function ReservarContent() {
 
         {/* Stepper */}
         <div className="flex justify-center mb-12">
-          {[1, 2, 3, 4].map((s) => (
+          {[1, 2, 3, 4, 5].map((s) => (
             <div key={s} className="flex items-center">
               <div
                 className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
@@ -393,7 +433,7 @@ function ReservarContent() {
               >
                 {s}
               </div>
-              {s < 4 && (
+              {s < 5 && (
                 <div
                   className={`w-16 h-1 ${
                     step > s ? 'bg-amber-500' : 'bg-white/10'
@@ -462,18 +502,44 @@ function ReservarContent() {
                 Selecciona un Barbero
               </h2>
 
-              <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {barberos.map((barbero) => (
                   <div
                     key={barbero.id}
                     onClick={() => setFormData({ ...formData, barbero_id: barbero.id })}
-                    className={`p-4 border rounded-xl cursor-pointer transition ${
+                    className={`flex items-center gap-4 p-4 border rounded-xl cursor-pointer transition-all duration-200 ${
                       formData.barbero_id === barbero.id
-                        ? 'border-amber-400 bg-amber-500/10'
-                        : 'border-white/10 hover:border-amber-400/40'
+                        ? 'border-amber-400 bg-amber-500/10 scale-[1.02]'
+                        : 'border-white/10 hover:border-amber-400/40 hover:bg-white/5'
                     }`}
                   >
-                    {barbero.full_name}
+                    <div className="relative w-16 h-16 rounded-full overflow-hidden bg-zinc-800 border border-white/20 shrink-0 flex items-center justify-center">
+                      {barbero.avatar_url ? (
+                        <img 
+                          src={barbero.avatar_url} 
+                          alt={barbero.full_name} 
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                             (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(barbero.full_name)}&background=f59e0b&color=000`;
+                          }}
+                        />
+                      ) : (
+                        <img 
+                          src={`https://ui-avatars.com/api/?name=${encodeURIComponent(barbero.full_name)}&background=f59e0b&color=000&size=128`} 
+                          alt={barbero.full_name} 
+                          className="w-full h-full object-cover"
+                        />
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-bold text-white text-base md:text-lg">{barbero.full_name}</h3>
+                      <p className="text-amber-500/80 text-xs md:text-sm font-medium">Especialista</p>
+                    </div>
+                    {formData.barbero_id === barbero.id && (
+                      <div className="ml-auto">
+                        <CheckCircle className="w-6 h-6 text-amber-500" />
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -585,7 +651,7 @@ function ReservarContent() {
                 {user ? 'Confirma tus datos' : 'Tus datos'}
               </h2>
 
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form onSubmit={(e) => { e.preventDefault(); setStep(5); }} className="space-y-4">
                 <Input
                   label="Nombre completo"
                   value={formData.nombre}
@@ -657,10 +723,68 @@ function ReservarContent() {
                     disabled={submitting || !formData.nombre || !formData.telefono || !formData.email}
                     className="bg-amber-500 hover:bg-amber-400 text-black"
                   >
-                    {submitting ? 'Reservando...' : 'Confirmar Reserva'}
+                    Siguiente (Pago QR)
                   </Button>
                 </div>
               </form>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* STEP 5: PAGO QR */}
+        {step === 5 && (
+          <Card className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl">
+            <CardContent className="pt-6 text-center">
+              <h2 className="text-xl font-bold mb-6 flex items-center justify-center gap-2">
+                💰 Pago de Anticipo
+              </h2>
+
+              <p className="text-zinc-400 mb-6">
+                Para confirmar tu cita, debes realizar un pago anticipado vía QR.
+              </p>
+
+              {qrPago ? (
+                <div className="bg-white p-4 rounded-xl inline-block mb-6">
+                  <img src={qrPago} alt="QR de Pago" className="w-48 h-48 object-contain" />
+                </div>
+              ) : (
+                <div className="w-48 h-48 bg-zinc-800 rounded-xl mx-auto flex items-center justify-center mb-6">
+                  <p className="text-sm text-zinc-500">QR no configurado</p>
+                </div>
+              )}
+
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 mb-8">
+                <p className="text-sm text-amber-400 mb-1">Monto a depositar:</p>
+                <p className="text-3xl font-bold text-amber-500">
+                  {(() => {
+                    const precioOriginal = servicioSeleccionado?.precio || 0
+                    const precioDesc = lealtadInfo ? precioOriginal * (1 - lealtadInfo.descuento) : precioOriginal
+                    const anticipo = Math.max(20, precioDesc * 0.5)
+                    return formatCurrency(anticipo)
+                  })()}
+                </p>
+                <p className="text-xs text-zinc-400 mt-2">Mínimo 20 Bs o el 50% del servicio.</p>
+              </div>
+
+              <div className="flex justify-between">
+                <Button
+                  type="button"
+                  onClick={() => setStep(4)}
+                  variant="outline"
+                  disabled={submitting}
+                >
+                  <ArrowLeft className="w-4 h-4 mr-2" /> Atrás
+                </Button>
+
+                <Button
+                  type="button"
+                  onClick={handleSubmit}
+                  disabled={submitting}
+                  className="bg-amber-500 hover:bg-amber-400 text-black px-8 font-bold"
+                >
+                  {submitting ? 'Verificando...' : 'Ya realicé el pago'}
+                </Button>
+              </div>
             </CardContent>
           </Card>
         )}

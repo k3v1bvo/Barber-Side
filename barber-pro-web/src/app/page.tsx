@@ -17,7 +17,12 @@ import {
   LogOut,
   LayoutDashboard,
   Loader2,
-  ShoppingBag
+  ShoppingBag,
+  Camera,
+  Users,
+  Package,
+  Instagram,
+  Globe
 } from 'lucide-react'
 import { SocialLinks } from '@/components/ui/SocialLinks'
 import { WhatsappFloat } from '@/components/ui/WhatsappFloat'
@@ -52,12 +57,23 @@ interface PortafolioItem {
   descripcion: string
 }
 
+interface EquipoHome {
+  id: string
+  nombre: string
+  especialidad: string
+  imagen_url: string
+  descripcion?: string
+  redes_sociales?: any
+}
+
 export default function HomePage() {
   const [user, setUser] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [servicios, setServicios] = useState<Servicio[]>([])
   const [productos, setProductos] = useState<Producto[]>([])
   const [portafolio, setPortafolio] = useState<PortafolioItem[]>([])
+  const [equipo, setEquipo] = useState<EquipoHome[]>([])
+  const [heroBgUrl, setHeroBgUrl] = useState('https://images.unsplash.com/photo-1585747860715-2ba37e788b70?w=1920')
   const [carouselIndex, setCarouselIndex] = useState(0)
   const router = useRouter()
   const supabase = createClient()
@@ -107,11 +123,50 @@ export default function HomePage() {
       const { data: portafolioData } = await supabase
         .from('portafolio')
         .select('id, image_url, categoria, descripcion')
+        .eq('is_active', true)
         .order('created_at', { ascending: false })
         .limit(12)
 
       if (portafolioData) {
         setPortafolio(portafolioData)
+      }
+
+      // Cargar barberos activos para mostrarlos en el equipo
+      const { data: barberosData } = await supabase
+        .from('profiles')
+        .select('id, full_name, avatar_url')
+        .eq('role', 'barbero')
+        .eq('is_active', true)
+
+      const { data: equipoData } = await supabase
+        .from('equipo_home')
+        .select('id, nombre, especialidad, imagen_url, profile_id, descripcion, redes_sociales')
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true })
+
+      const mergedEquipo = barberosData?.map(prof => {
+        const equipoConfig = equipoData?.find(e => e.profile_id === prof.id || e.nombre === prof.full_name)
+        return {
+          id: prof.id,
+          nombre: prof.full_name || 'Barbero',
+          especialidad: equipoConfig?.especialidad || 'Barbero Especialista',
+          imagen_url: equipoConfig?.imagen_url || prof.avatar_url || '',
+          descripcion: equipoConfig?.descripcion,
+          redes_sociales: equipoConfig?.redes_sociales
+        }
+      }) || []
+
+      setEquipo(mergedEquipo)
+
+      // 6. Cargar configuración global
+      const { data: configData } = await supabase
+        .from('configuraciones')
+        .select('valor')
+        .eq('llave', 'hero_bg_image')
+        .single()
+
+      if (configData && configData.valor?.url) {
+        setHeroBgUrl(configData.valor.url)
       }
 
       setLoading(false)
@@ -129,7 +184,7 @@ export default function HomePage() {
   const getRoleLabel = (role: string) => {
     const roles: Record<string, string> = {
       admin: 'Administrador',
-      recepcionista: 'Recepcionista',
+      coordinador: 'Coordinador/a',
       barbero: 'Barbero',
       cliente: 'Cliente'
     }
@@ -140,7 +195,7 @@ export default function HomePage() {
     switch (role) {
       case 'admin': return '/admin'
       case 'barbero': return '/barbero'
-      case 'recepcionista': return '/recepcion'
+      case 'coordinador': return '/coordinador'
       case 'cliente': return '/cliente'  // ✅ AGREGADO
       default: return '/'
     }
@@ -234,7 +289,10 @@ export default function HomePage() {
 
       {/* Hero Section */}
       <section className="relative h-screen flex items-center justify-center overflow-hidden">
-        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1585747860715-2ba37e788b70?w=1920')] bg-cover bg-center">
+        <div 
+          className="absolute inset-0 bg-cover bg-center transition-all duration-1000"
+          style={{ backgroundImage: `url('${heroBgUrl}')` }}
+        >
           <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/50 to-black" />
         </div>
 
@@ -375,83 +433,101 @@ export default function HomePage() {
       </section>
 
       {/* Galería / Portafolio */}
-      {portafolio.length > 0 && (
-        <section id="galeria" className="py-24 bg-zinc-950 border-t border-white/5">
-          <div className="max-w-7xl mx-auto px-4">
-            <div className="text-center mb-12">
-              <p className="text-amber-400 uppercase tracking-widest text-sm font-bold mb-4">Nuestro trabajo</p>
-              <h2 className="text-5xl font-bold mb-4">Galería</h2>
-              <p className="text-gray-400 max-w-xl mx-auto">
-                Estilos recientes de nuestro equipo. Las fotos se actualizan desde el panel de portafolio.
-              </p>
-            </div>
+      <section id="galeria" className="py-24 bg-zinc-950 border-t border-white/5">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="text-center mb-12">
+            <p className="text-amber-400 uppercase tracking-widest text-sm font-bold mb-4">Nuestro trabajo</p>
+            <h2 className="text-5xl font-bold mb-4">Galería</h2>
+            <p className="text-gray-400 max-w-xl mx-auto">
+              Estilos recientes de nuestro equipo. Las fotos se actualizan desde el panel de portafolio.
+            </p>
+          </div>
 
-            <div className="relative aspect-[16/9] max-h-[520px] rounded-2xl overflow-hidden border border-white/10 group">
-              <img
-                src={portafolio[carouselIndex]?.image_url}
-                alt={portafolio[carouselIndex]?.descripcion || 'Trabajo de barbería'}
-                className="w-full h-full object-cover transition-opacity duration-500"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-              <div className="absolute bottom-6 left-6 right-6 flex justify-between items-end gap-4">
-                <div>
-                  <span className="text-xs font-black uppercase tracking-widest text-amber-400">
-                    {portafolio[carouselIndex]?.categoria}
-                  </span>
-                  <p className="text-white font-medium mt-1 max-w-lg">
-                    {portafolio[carouselIndex]?.descripcion || 'Estilo Barber Pro'}
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setCarouselIndex((i) => (i - 1 + portafolio.length) % portafolio.length)
-                    }
-                    className="w-10 h-10 rounded-full bg-black/50 border border-white/20 hover:bg-amber-500 hover:text-black transition-colors font-bold"
-                    aria-label="Anterior"
-                  >
-                    ‹
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setCarouselIndex((i) => (i + 1) % portafolio.length)}
-                    className="w-10 h-10 rounded-full bg-black/50 border border-white/20 hover:bg-amber-500 hover:text-black transition-colors font-bold"
-                    aria-label="Siguiente"
-                  >
-                    ›
-                  </button>
+          {portafolio.length > 0 ? (
+            <>
+              <div className="relative aspect-[16/9] max-h-[520px] rounded-2xl overflow-hidden border border-white/10 group">
+                <img
+                  src={portafolio[carouselIndex]?.image_url}
+                  alt={portafolio[carouselIndex]?.descripcion || 'Trabajo de barbería'}
+                  className="w-full h-full object-cover transition-opacity duration-500"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                <div className="absolute bottom-6 left-6 right-6 flex justify-between items-end gap-4">
+                  <div>
+                    <span className="text-xs font-black uppercase tracking-widest text-amber-400">
+                      {portafolio[carouselIndex]?.categoria}
+                    </span>
+                    <p className="text-white font-medium mt-1 max-w-lg">
+                      {portafolio[carouselIndex]?.descripcion || 'Estilo Barber Pro'}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCarouselIndex((i) => (i - 1 + portafolio.length) % portafolio.length)
+                      }
+                      className="w-10 h-10 rounded-full bg-black/50 border border-white/20 hover:bg-amber-500 hover:text-black transition-colors font-bold"
+                      aria-label="Anterior"
+                    >
+                      ‹
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCarouselIndex((i) => (i + 1) % portafolio.length)}
+                      className="w-10 h-10 rounded-full bg-black/50 border border-white/20 hover:bg-amber-500 hover:text-black transition-colors font-bold"
+                      aria-label="Siguiente"
+                    >
+                      ›
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="flex gap-2 mt-4 overflow-x-auto pb-2">
-              {portafolio.map((item, idx) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setCarouselIndex(idx)}
-                  className={`shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-all ${
-                    idx === carouselIndex ? 'border-amber-500 scale-105' : 'border-white/10 opacity-60 hover:opacity-100'
-                  }`}
+              <div className="flex gap-2 mt-4 overflow-x-auto pb-2">
+                {portafolio.map((item, idx) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setCarouselIndex(idx)}
+                    className={`shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-all ${
+                      idx === carouselIndex ? 'border-amber-500 scale-105' : 'border-white/10 opacity-60 hover:opacity-100'
+                    }`}
+                  >
+                    <img src={item.image_url} alt="" className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+
+              <div className="text-center mt-8">
+                <Link
+                  href="/galeria"
+                  className="inline-flex items-center gap-2 text-amber-400 font-bold hover:text-amber-300 transition"
                 >
-                  <img src={item.image_url} alt="" className="w-full h-full object-cover" />
-                </button>
-              ))}
+                  Ver galería completa
+                  <ChevronRight className="w-5 h-5" />
+                </Link>
+              </div>
+            </>
+          ) : (
+            <div className="text-center py-16 border-2 border-dashed border-white/10 rounded-3xl bg-zinc-900/50">
+              <Camera className="w-16 h-16 text-zinc-700 mx-auto mb-4" />
+              <h3 className="text-2xl font-bold mb-2">Galería en preparación</h3>
+              <p className="text-gray-500 mb-6 max-w-md mx-auto">
+                Ve al panel de Portafolio para agregar las primeras imágenes a la galería del Home.
+              </p>
+              {user && (
+                <Link
+                  href="/admin/portafolio"
+                  className="inline-flex items-center justify-center px-6 py-3 bg-white text-black font-bold uppercase tracking-widest text-sm rounded-full hover:bg-amber-400 transition-colors"
+                >
+                  Ir al Portafolio
+                </Link>
+              )}
             </div>
-
-            <div className="text-center mt-8">
-              <Link
-                href="/galeria"
-                className="inline-flex items-center gap-2 text-amber-400 font-bold hover:text-amber-300 transition"
-              >
-                Ver galería completa
-                <ChevronRight className="w-5 h-5" />
-              </Link>
-            </div>
-          </div>
-        </section>
-      )}
+          )}
+        </div>
+      </section>
 
       {/* Acerca de */}
       <section id="acerca" className="py-24 bg-black">
@@ -532,11 +608,17 @@ export default function HomePage() {
               {productos.map((producto) => (
                 <div key={producto.id} className="bg-zinc-900/50 rounded-2xl overflow-hidden border border-white/5 group hover:border-amber-500/30 transition-all">
                   <div className="aspect-square bg-zinc-800 relative overflow-hidden">
-                    <img
-                      src={producto.image_url || 'https://images.unsplash.com/photo-1596755389378-c31d21fd1273?w=500'}
-                      alt={producto.nombre}
-                      className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-500"
-                    />
+                    {producto.image_url ? (
+                      <img
+                        src={producto.image_url}
+                        alt={producto.nombre}
+                        className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-500"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Package className="w-16 h-16 text-zinc-700" />
+                      </div>
+                    )}
                   </div>
                   <div className="p-6 text-center">
                     <h3 className="text-lg font-bold mb-2 line-clamp-1">{producto.nombre}</h3>
@@ -570,34 +652,78 @@ export default function HomePage() {
             <h2 className="text-5xl font-bold">Barberos Expertos</h2>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {[
-              { nombre: 'Carlos Rodríguez', especialidad: 'Cortes Clásicos', imagen: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400' },
-              { nombre: 'Miguel Ángel', especialidad: 'Fade & Design', imagen: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400' },
-              { nombre: 'José Martínez', especialidad: 'Barba & Afeitado', imagen: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400' }
-            ].map((barbero, i) => (
-              <div key={i} className="group text-center">
+          {equipo.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {equipo.map((barbero) => (
+              <div key={barbero.id} className="group text-center">
                 <div className="relative inline-block mb-6">
                   <div className="w-64 h-64 rounded-full overflow-hidden mx-auto">
-                    <img
-                      src={barbero.imagen}
-                      alt={barbero.nombre}
-                      className="w-full h-full object-cover blur-[3px] grayscale opacity-70 group-hover:blur-[0px] group-hover:grayscale-0 group-hover:opacity-100 transform group-hover:scale-110 transition-all duration-500"
-                    />
+                    {barbero.imagen_url ? (
+                      <img
+                        src={barbero.imagen_url}
+                        alt={barbero.nombre}
+                        className="w-full h-full object-cover blur-[3px] grayscale opacity-70 group-hover:blur-[0px] group-hover:grayscale-0 group-hover:opacity-100 transform group-hover:scale-110 transition-all duration-500"
+                        onError={(e) => {
+                           (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(barbero.nombre)}&background=f59e0b&color=000&size=256`;
+                        }}
+                      />
+                    ) : (
+                      <img
+                        src={`https://ui-avatars.com/api/?name=${encodeURIComponent(barbero.nombre)}&background=f59e0b&color=000&size=256`}
+                        alt={barbero.nombre}
+                        className="w-full h-full object-cover blur-[3px] grayscale opacity-70 group-hover:blur-[0px] group-hover:grayscale-0 group-hover:opacity-100 transform group-hover:scale-110 transition-all duration-500"
+                      />
+                    )}
                   </div>
-                  <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 bg-amber-400 text-black px-4 py-1 rounded-full text-sm font-bold">
+                  <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 bg-amber-400 text-black px-4 py-1 rounded-full text-sm font-bold truncate max-w-[200px]">
                     {barbero.especialidad}
                   </div>
                 </div>
-                <h3 className="text-xl font-bold mb-2">{barbero.nombre}</h3>
-                <div className="flex justify-center gap-1">
-                  {[1, 2, 3, 4, 5].map((_, j) => (
-                    <Star key={j} className="w-4 h-4 fill-amber-400 text-amber-400" />
-                  ))}
+                  <h3 className="text-xl font-bold mb-2">{barbero.nombre}</h3>
+                  {barbero.descripcion && (
+                    <p className="text-gray-400 text-sm mb-4 max-w-xs mx-auto line-clamp-3">
+                      {barbero.descripcion}
+                    </p>
+                  )}
+                  <div className="flex justify-center gap-1 mb-4">
+                    {[1, 2, 3, 4, 5].map((_, j) => (
+                      <Star key={j} className="w-4 h-4 fill-amber-400 text-amber-400" />
+                    ))}
+                  </div>
+                  {barbero.redes_sociales && (barbero.redes_sociales.instagram || barbero.redes_sociales.web) && (
+                    <div className="flex justify-center gap-3">
+                      {barbero.redes_sociales.instagram && (
+                        <a href={barbero.redes_sociales.instagram} target="_blank" rel="noopener noreferrer" className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-amber-400 hover:bg-zinc-700 transition">
+                          <Instagram className="w-4 h-4" />
+                        </a>
+                      )}
+                      {barbero.redes_sociales.web && (
+                        <a href={barbero.redes_sociales.web} target="_blank" rel="noopener noreferrer" className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-amber-400 hover:bg-zinc-700 transition">
+                          <Globe className="w-4 h-4" />
+                        </a>
+                      )}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-16 border-2 border-dashed border-white/10 rounded-3xl bg-black/50">
+              <Users className="w-16 h-16 text-zinc-700 mx-auto mb-4" />
+              <h3 className="text-2xl font-bold mb-2">Conoce al equipo</h3>
+              <p className="text-gray-500 mb-6 max-w-md mx-auto">
+                Ve al panel de Equipo para agregar los perfiles de los barberos.
+              </p>
+              {user && (
+                <Link
+                  href="/admin/equipo"
+                  className="inline-flex items-center justify-center px-6 py-3 bg-white text-black font-bold uppercase tracking-widest text-sm rounded-full hover:bg-amber-400 transition-colors"
+                >
+                  Ir al panel de Equipo
+                </Link>
+              )}
+            </div>
+          )}
         </div>
       </section>
 

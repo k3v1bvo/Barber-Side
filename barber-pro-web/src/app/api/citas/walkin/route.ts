@@ -44,10 +44,28 @@ export async function POST(request: Request) {
       }
     }
 
-    // 2. Obtener precio del servicio
-    const { data: serv } = await supabase.from('servicios').select('precio').eq('id', servicio_id).single()
+    // 2. Obtener precio del servicio y comisión
+    const { data: serv } = await supabase.from('servicios').select('precio, comision_activa, comision_tipo, comision_valor, comision_acumulable').eq('id', servicio_id).single()
     const precioBase = serv?.precio || 0
-    const comisionTotal = precioBase * 0.3 + ((propinas || 0) * 0.5) // Asumimos 30% fijo por ahora
+    
+    // Obtener comisión del barbero
+    const { data: barbero } = await supabase.from('profiles').select('comision_porcentaje').eq('id', user.id).single()
+    const barberoComision = barbero?.comision_porcentaje || 0
+    
+    let baseComision = 0
+    if (serv?.comision_activa !== false && serv?.comision_tipo !== 'ninguna') {
+      if (serv?.comision_tipo === 'fija') {
+        baseComision = serv?.comision_valor || 0
+      } else if (serv?.comision_tipo === 'porcentaje') {
+        baseComision = (precioBase * (serv?.comision_valor || 0)) / 100
+      } else {
+        baseComision = (precioBase * barberoComision) / 100
+      }
+    }
+    
+    // Sumar propinas si la comisión es acumulable o si no hay regla estricta (por defecto se suma en walk-in)
+    const extraPropinas = serv?.comision_acumulable !== false ? (propinas || 0) : 0
+    const comisionTotal = baseComision + extraPropinas
 
     // 3. Crear Cita "Completada" instantánea
     // Simulamos que empezó hace media hora y terminó justo ahora

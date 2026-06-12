@@ -1,0 +1,125 @@
+import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { NextResponse } from 'next/server'
+
+// Agrega TODAS las imágenes subidas al sistema, clasificadas por origen
+export async function GET() {
+  try {
+    const supabase = await createServerSupabaseClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+    if (!profile || !['admin', 'coordinador'].includes(profile.role)) {
+      return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
+    }
+
+    const [portRes, equipoRes, prodRes, perfilesRes, cumpleRes, configRes] = await Promise.all([
+      supabase.from('portafolio').select('id,image_url,titulo,categoria,barbero_id,profiles!barbero_id(full_name),created_at').eq('is_active', true).order('created_at', { ascending: false }).limit(100),
+      supabase.from('equipo_home').select('id,imagen_url,nombre,especialidad,created_at').order('created_at', { ascending: false }),
+      supabase.from('productos').select('id,nombre,image_url,categoria,created_at').not('image_url', 'is', null).limit(100),
+      supabase.from('profiles').select('id,full_name,avatar_url,role').not('avatar_url', 'is', null).limit(50),
+      supabase.from('cumpleanos_verificados').select('id,foto_documento_url,tipo_documento,clientes(nombre),created_at').not('foto_documento_url', 'is', null).order('created_at', { ascending: false }).limit(50),
+      supabase.from('configuraciones').select('llave,valor,descripcion').in('llave', ['qr_pago', 'hero_bg_image']),
+    ])
+
+    // Normalizar cada fuente a formato { id, url, label, categoria, meta, fecha }
+    const galeria: any[] = []
+
+    // 1. QR y Hero bg desde configuraciones
+    for (const cfg of configRes.data ?? []) {
+      if (cfg.valor?.url) {
+        galeria.push({
+          id: `cfg-${cfg.llave}`,
+          url: cfg.valor.url,
+          label: cfg.llave === 'qr_pago' ? 'QR de Pagos' : 'Fondo de Inicio (Hero)',
+          categoria: 'Sistema',
+          icono: cfg.llave === 'qr_pago' ? '📱' : '🖼️',
+          meta: cfg.descripcion,
+          fecha: null,
+        })
+      }
+    }
+
+    // 2. Portfolio / galería de trabajos
+    for (const p of portRes.data ?? []) {
+      if (p.image_url) {
+        galeria.push({
+          id: `port-${p.id}`,
+          url: p.image_url,
+          label: p.titulo || p.categoria,
+          categoria: 'Portafolio',
+          icono: '✂️',
+          meta: (p as any).profiles?.full_name ?? 'Barbero',
+          fecha: p.created_at,
+        })
+      }
+    }
+
+    // 3. Equipo (carrusel de barberos en la web pública)
+    for (const e of equipoRes.data ?? []) {
+      if (e.imagen_url) {
+        galeria.push({
+          id: `equipo-${e.id}`,
+          url: e.imagen_url,
+          label: e.nombre,
+          categoria: 'Equipo',
+          icono: '👤',
+          meta: e.especialidad,
+          fecha: e.created_at,
+        })
+      }
+    }
+
+    // 4. Productos
+    for (const p of prodRes.data ?? []) {
+      const url = p.image_url
+      if (url) {
+        galeria.push({
+          id: `prod-${p.id}`,
+          url,
+          label: p.nombre,
+          categoria: 'Productos',
+          icono: '📦',
+          meta: p.categoria,
+          fecha: p.created_at,
+        })
+      }
+    }
+
+    // 5. Avatares de perfiles
+    for (const p of perfilesRes.data ?? []) {
+      if (p.avatar_url) {
+        galeria.push({
+          id: `perfil-${p.id}`,
+          url: p.avatar_url,
+          label: p.full_name || 'Usuario',
+          categoria: 'Avatares',
+          icono: '🧑',
+          meta: p.role,
+          fecha: null,
+        })
+      }
+    }
+
+    // 6. Fotos de documentos de cumpleaños
+    for (const c of cumpleRes.data ?? []) {
+      if (c.foto_documento_url) {
+        galeria.push({
+          id: `cumple-${c.id}`,
+          url: c.foto_documento_url,
+          label: (c as any).clientes?.nombre ?? 'Cliente',
+          categoria: 'Documentos Cumpleaños',
+          icono: '🎂',
+          meta: c.tipo_documento,
+          fecha: c.created_at,
+        })
+      }
+    }
+
+    const categorias = [...new Set(galeria.map(g => g.categoria))]
+    return NextResponse.json({ galeria, categorias, total: galeria.length })
+  } catch (err) {
+    console.error('Error galeria:', err)
+    return NextResponse.json({ error: 'Error interno' }, { status: 500 })
+  }
+}

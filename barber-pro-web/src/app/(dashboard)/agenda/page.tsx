@@ -53,7 +53,7 @@ export default function AgendaGeneralPage() {
           return
         }
 
-        if (role !== 'admin' && role !== 'recepcionista') {
+        if (role !== 'admin' && role !== 'coordinador') {
           setAuthorized(false)
           return
         }

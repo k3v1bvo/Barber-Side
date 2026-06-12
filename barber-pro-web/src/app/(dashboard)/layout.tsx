@@ -2,6 +2,8 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { Sidebar } from '@/components/ui/Sidebar'
 import { Navbar } from '@/components/ui/Navbar'
+import { SidebarProvider } from '@/components/providers/SidebarProvider'
+import { DashboardContent } from '@/components/ui/DashboardContent'
 
 export default async function DashboardLayout({
   children,
@@ -20,20 +22,23 @@ export default async function DashboardLayout({
     .single()
 
   return (
-    <div className="flex min-h-screen bg-zinc-950">
-      {/* Sidebar for Desktop */}
-      <Sidebar role={profile?.role} userId={user.id} />
+    <SidebarProvider>
+      <div className="flex min-h-screen bg-zinc-950">
+        {/* Sidebar for Desktop + Mobile overlay */}
+        <Sidebar role={profile?.role} userId={user.id} />
 
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Navbar acting as Header & Mobile Nav */}
-        <Navbar />
+        {/* Content area with responsive margin */}
+        <DashboardContent>
+          {/* Navbar acting as Header & Mobile Nav */}
+          <Navbar />
 
-        <main className="flex-1 overflow-y-auto p-4 lg:p-8">
-          <div className="max-w-7xl mx-auto">
-            {children}
-          </div>
-        </main>
+          <main className="flex-1 overflow-y-auto p-4 lg:p-8">
+            <div className="max-w-7xl mx-auto">
+              {children}
+            </div>
+          </main>
+        </DashboardContent>
       </div>
-    </div>
+    </SidebarProvider>
   )
 }

@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
       .eq('id', user.id)
       .single()
 
-    if (profile?.role !== 'admin' && profile?.role !== 'recepcionista') {
+    if (profile?.role !== 'admin' && profile?.role !== 'coordinador') {
       return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
     }
 

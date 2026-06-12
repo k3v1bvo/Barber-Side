@@ -17,7 +17,7 @@ export async function POST(request: Request) {
     .eq('id', user.id)
     .single()
 
-  if (profile?.role !== 'admin' && profile?.role !== 'recepcionista') {
+  if (profile?.role !== 'admin' && profile?.role !== 'coordinador') {
     return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
   }
 
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
 
     const { data: servicio } = await supabase
       .from('servicios')
-      .select('precio, duracion_minutos')
+      .select('precio, duracion_minutos, comision_activa, comision_tipo, comision_valor')
       .eq('id', servicio_id)
       .single()
 
@@ -42,7 +42,18 @@ export async function POST(request: Request) {
       .single()
 
     const comisionPorcentaje = barbero?.comision_porcentaje || 0
-    const comisionBarbero = (servicio.precio * comisionPorcentaje) / 100
+    let comisionBarbero = 0
+
+    if (servicio.comision_activa !== false && servicio.comision_tipo !== 'ninguna') {
+      if (servicio.comision_tipo === 'fija') {
+        comisionBarbero = servicio.comision_valor || 0
+      } else if (servicio.comision_tipo === 'porcentaje') {
+        comisionBarbero = (servicio.precio * (servicio.comision_valor || 0)) / 100
+      } else {
+        // global o sin definir
+        comisionBarbero = (servicio.precio * comisionPorcentaje) / 100
+      }
+    }
 
     const { data: cita, error } = await supabase
       .from('citas')

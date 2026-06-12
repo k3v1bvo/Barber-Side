@@ -33,7 +33,7 @@ export async function POST(request: Request) {
       .single()
 
     const puedeFinalizar = profile?.role === 'admin' || 
-                           profile?.role === 'recepcionista' ||
+                           profile?.role === 'coordinador' ||
                            (profile?.role === 'barbero' && cita.barbero_id === user.id)
 
     if (!puedeFinalizar) {

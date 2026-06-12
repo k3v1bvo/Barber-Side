@@ -66,10 +66,10 @@ export default function AgendaIndividualPage() {
         setUserRole(role)
 
         const isAdmin = role === 'admin'
-        const isRecepcionista = role === 'recepcionista'
+        const isCoordinador = role === 'coordinador'
         const isOwnBarber = role === 'barbero' && user.id === barberoId
 
-        if (!isAdmin && !isRecepcionista && !isOwnBarber) {
+        if (!isAdmin && !isCoordinador && !isOwnBarber) {
           setAuthError('No tienes permisos para acceder a esta agenda')
           setAuthorized(false)
           return
@@ -78,7 +78,7 @@ export default function AgendaIndividualPage() {
         setAuthorized(true)
         setSelectedBarberoId(barberoId)
 
-        if (isAdmin || isRecepcionista) {
+        if (isAdmin || isCoordinador) {
           const { data: barberosList } = await supabase
             .from('profiles')
             .select('id, full_name')
@@ -167,7 +167,7 @@ export default function AgendaIndividualPage() {
 
   if (!authorized) return null
 
-  const showGeneralLink = userRole === 'admin' || userRole === 'recepcionista'
+  const showGeneralLink = userRole === 'admin' || userRole === 'coordinador'
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-20 lg:pb-0">
@@ -189,7 +189,7 @@ export default function AgendaIndividualPage() {
         </div>
       </div>
 
-      {(userRole === 'admin' || userRole === 'recepcionista') && barberos.length > 0 && (
+      {(userRole === 'admin' || userRole === 'coordinador') && barberos.length > 0 && (
         <Card className="border-white/5 bg-zinc-900/30">
           <CardContent className="p-6">
             <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-3">
@@ -308,7 +308,7 @@ export default function AgendaIndividualPage() {
           barberoId={selectedBarberoId}
           canEdit={
             userRole === 'admin' ||
-            userRole === 'recepcionista' ||
+            userRole === 'coordinador' ||
             userRole === 'barbero'
           }
         />

@@ -29,7 +29,7 @@ export default function LoginPage() {
           .single()
 
         if (profile?.role === 'admin') router.push('/admin')
-        else if (profile?.role === 'recepcionista') router.push('/recepcion')
+        else if (profile?.role === 'coordinador') router.push('/coordinador')
         else if (profile?.role === 'barbero') router.push('/barbero')
         else if (profile?.role === 'cliente') router.push('/cliente')
         else router.push('/')
@@ -65,7 +65,7 @@ export default function LoginPage() {
           .single()
 
         if (profile?.role === 'admin') router.push('/admin')
-        else if (profile?.role === 'recepcionista') router.push('/recepcion')
+        else if (profile?.role === 'coordinador') router.push('/coordinador')
         else if (profile?.role === 'barbero') router.push('/barbero')
         else if (profile?.role === 'cliente') router.push('/cliente')
         else router.push('/')
