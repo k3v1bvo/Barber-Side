@@ -28,6 +28,7 @@ import {
   Cake,
   Images,
   Sliders,
+  RefreshCw,
 } from 'lucide-react'
 
 export interface NavItem {
@@ -98,6 +99,7 @@ export function getAdminNavSections(agendaHref: string): NavSection[] {
         { label: 'Reglas Laborales', href: '/admin/reglas-laborales', icon: Sliders, description: 'Comisiones, sanciones y bonos' },
         { label: 'Galería', href: '/admin/galeria', icon: Images, description: 'Todas las imágenes del sistema' },
         { label: 'Buscar', href: '/admin/buscar', icon: Search },
+        { label: 'Sincronizar Historial', href: '/admin/sincronizar', icon: RefreshCw, description: 'Asignar citas antiguas' },
       ],
     },
   ]
@@ -142,6 +144,7 @@ export function getCoordinadorNavSections(agendaHref: string): NavSection[] {
         { label: 'Galería del Sistema', href: '/admin/galeria', icon: Images, description: 'Imágenes subidas' },
         { label: 'Equipo Home', href: '/admin/equipo', icon: Users, description: 'Miembros web' },
         { label: 'Buscar', href: '/admin/buscar', icon: Search, description: 'Búsqueda global' },
+        { label: 'Sincronizar Historial', href: '/admin/sincronizar', icon: RefreshCw, description: 'Asignar citas antiguas' },
       ],
     },
   ]

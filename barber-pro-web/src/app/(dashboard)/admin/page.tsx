@@ -21,6 +21,9 @@ import { StatCard } from '@/components/admin/StatCard'
 import { AdminQuickActions } from '@/components/admin/AdminQuickActions'
 import { AdminAlertsPanel } from '@/components/admin/AdminAlertsPanel'
 import { AdminAsistenciaSummary } from '@/components/admin/AdminAsistenciaSummary'
+import {
+  BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
+} from 'recharts'
 
 interface Stats {
   ventasHoy: number
@@ -49,6 +52,8 @@ export default function AdminPage() {
   })
   const [turnosAbiertos, setTurnosAbiertos] = useState(0)
   const [citasRecientes, setCitasRecientes] = useState<Cita[]>([])
+  const [ventasSemana, setVentasSemana] = useState<{fecha: string, total: number}[]>([])
+  const [topBarberos, setTopBarberos] = useState<{nombre: string, ventas: number, citas: number}[]>([])
   const [loading, setLoading] = useState(true)
   const router = useRouter()
   const supabase = createClient()
@@ -94,6 +99,7 @@ export default function AdminPage() {
           id,
           estado,
           precio,
+          fecha_hora,
           clientes (nombre),
           barberos:profiles!barbero_id (full_name),
           servicios (nombre)
@@ -103,6 +109,42 @@ export default function AdminPage() {
           .order('fecha_hora', { ascending: false })
           .limit(8),
       ])
+
+      // Data for charts
+      const hace7Dias = new Date()
+      hace7Dias.setDate(hace7Dias.getDate() - 7)
+      
+      const { data: citasMes } = await supabase
+        .from('citas')
+        .select('precio, fecha_hora, barberos:profiles!barbero_id(full_name)')
+        .eq('estado', 'completado')
+        .gte('fecha_hora', hace7Dias.toISOString())
+
+      // Agrupar ventas de los últimos 7 días
+      const ventasPorDia: Record<string, number> = {}
+      // Agrupar top barberos
+      const barberosStats: Record<string, { ventas: number, citas: number }> = {}
+
+      if (citasMes) {
+        citasMes.forEach((c: any) => {
+          const fechaStr = new Date(c.fecha_hora).toLocaleDateString('es-BO', { weekday: 'short' })
+          ventasPorDia[fechaStr] = (ventasPorDia[fechaStr] || 0) + c.precio
+
+          const barberoNombre = c.barberos?.full_name || 'Sin asignar'
+          if (!barberosStats[barberoNombre]) barberosStats[barberoNombre] = { ventas: 0, citas: 0 }
+          barberosStats[barberoNombre].ventas += c.precio
+          barberosStats[barberoNombre].citas += 1
+        })
+      }
+
+      const arrVentasSemana = Object.entries(ventasPorDia).map(([f, t]) => ({ fecha: f, total: t }))
+      const arrTopBarberos = Object.entries(barberosStats)
+        .map(([n, s]) => ({ nombre: n, ventas: s.ventas, citas: s.citas }))
+        .sort((a, b) => b.ventas - a.ventas)
+        .slice(0, 5)
+
+      setVentasSemana(arrVentasSemana)
+      setTopBarberos(arrTopBarberos)
 
       const ventasHoy =
         ventasData?.reduce((acc: number, v: { precio: number }) => acc + v.precio, 0) || 0
@@ -208,6 +250,71 @@ export default function AdminPage() {
       </div>
 
       <AdminQuickActions />
+
+      {/* Gráficas Mamalonas */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-in fade-in duration-500 delay-200 fill-mode-both">
+        <Card className="border-white/5 bg-gradient-to-br from-zinc-900 to-black relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-64 h-64 bg-amber-500/5 rounded-full blur-3xl -ml-20 -mt-20 pointer-events-none"></div>
+          <CardHeader>
+            <CardTitle className="text-sm flex items-center gap-2">
+              <BarChart3 className="w-4 h-4 text-amber-500" />
+              Ingresos Últimos 7 Días
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-64 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={ventasSemana}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#ffffff05" />
+                  <XAxis dataKey="fecha" stroke="#a1a1aa" fontSize={10} tickLine={false} axisLine={false} />
+                  <YAxis hide domain={['auto', 'auto']} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#09090b', borderColor: '#ffffff10', borderRadius: '12px' }}
+                    itemStyle={{ color: '#f59e0b', fontWeight: 'bold' }}
+                    formatter={(value: any) => formatCurrency(value)} 
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="total" 
+                    stroke="#f59e0b" 
+                    strokeWidth={4}
+                    dot={{ fill: '#f59e0b', strokeWidth: 2, r: 4 }}
+                    activeDot={{ r: 6, stroke: '#000', strokeWidth: 2 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-white/5 bg-gradient-to-bl from-zinc-900 to-black relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
+          <CardHeader>
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Users className="w-4 h-4 text-purple-500" />
+              Top Barberos (Semana)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-64 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={topBarberos} layout="vertical" margin={{ left: 40 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#ffffff05" />
+                  <XAxis type="number" hide />
+                  <YAxis dataKey="nombre" type="category" stroke="#a1a1aa" fontSize={10} tickLine={false} axisLine={false} width={80} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#09090b', borderColor: '#ffffff10', borderRadius: '12px' }}
+                    itemStyle={{ color: '#a855f7', fontWeight: 'bold' }}
+                    cursor={{fill: '#ffffff05'}}
+                    formatter={(value: any) => formatCurrency(value)} 
+                  />
+                  <Bar dataKey="ventas" fill="#a855f7" radius={[0, 4, 4, 0]} barSize={24} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <div className="xl:col-span-2">

@@ -40,7 +40,19 @@ export default function BarberoPage() {
     semana: { citas: 0, ventas: 0, comision: 0 }
   })
   const [citas, setCitas] = useState<Cita[]>([])
-  const [finanzas, setFinanzas] = useState({ saldo_adelantos: 0, total_sanciones: 0, total_bonos: 0 })
+  const [finanzas, setFinanzas] = useState<{
+    saldo_adelantos: number, 
+    total_sanciones: number, 
+    total_bonos: number,
+    bonos_pendientes: any[],
+    sanciones_pendientes: any[]
+  }>({ 
+    saldo_adelantos: 0, 
+    total_sanciones: 0, 
+    total_bonos: 0,
+    bonos_pendientes: [],
+    sanciones_pendientes: []
+  })
   const [loading, setLoading] = useState(true)
   const [filtroFecha, setFiltroFecha] = useState('hoy')
   const [filtroEstado, setFiltroEstado] = useState('todos')
@@ -52,6 +64,7 @@ export default function BarberoPage() {
     nombreCliente: '', emailCliente: '', telefonoCliente: '', servicio_id: '', metodo_pago: 'efectivo', propinas: 0
   })
   const [submittingWalkin, setSubmittingWalkin] = useState(false)
+  const [metaServicios, setMetaServicios] = useState<number>(30)
   const router = useRouter()
   const supabase = createClient()
 
@@ -69,6 +82,11 @@ export default function BarberoPage() {
 
       const { data: servs } = await supabase.from('servicios').select('id, nombre, precio').eq('is_active', true)
       if (servs) setServicios(servs)
+
+      const { data: config } = await supabase.from('configuraciones').select('valor').eq('llave', 'bonos_config').single()
+      if (config?.valor?.cantidad_servicios?.meta_cantidad) {
+        setMetaServicios(config.valor.cantidad_servicios.meta_cantidad)
+      }
 
       const hoy = new Date().toISOString().split('T')[0]
       const semanaAtras = new Date()
@@ -171,7 +189,7 @@ export default function BarberoPage() {
         const finReq = await fetch(`/api/comisiones?barbero_id=${user.id}&estado=pendiente`)
         if (finReq.ok) {
           const finData = await finReq.json()
-          setFinanzas(finData.finanzas || { saldo_adelantos: 0, total_sanciones: 0, total_bonos: 0 })
+          setFinanzas(finData.finanzas || { saldo_adelantos: 0, total_sanciones: 0, total_bonos: 0, bonos_pendientes: [], sanciones_pendientes: [] })
         }
       } catch (err) {
         console.error('Error fetching finanzas', err)
@@ -259,7 +277,7 @@ export default function BarberoPage() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6">
         <Card className="border-none bg-zinc-900 shadow-xl">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -322,18 +340,66 @@ export default function BarberoPage() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest">Deuda / Préstamos</p>
+                <p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest">Sanciones / Deuda</p>
                 <p className="text-3xl font-black text-red-500 mt-1 tracking-tighter">
                   {formatCurrency(finanzas.saldo_adelantos + finanzas.total_sanciones)}
                 </p>
                 <p className="text-[9px] font-bold text-zinc-600 mt-1 uppercase">
-                  (Adelantos: {formatCurrency(finanzas.saldo_adelantos)} | Sanc.: {formatCurrency(finanzas.total_sanciones)})
+                  A DESCONTAR
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-none bg-zinc-900 shadow-xl">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest">Bonos Extra</p>
+                <p className="text-3xl font-black text-green-500 mt-1 tracking-tighter">
+                  {formatCurrency(finanzas.total_bonos)}
+                </p>
+                <p className="text-[9px] font-bold text-zinc-600 mt-1 uppercase">
+                  A COBRAR
                 </p>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
+
+      {/* Meta de la Semana (Progress) */}
+      <Card className="bg-gradient-to-r from-zinc-900 to-black border-white/5 shadow-2xl relative overflow-hidden group">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none transition-all group-hover:bg-amber-500/10"></div>
+        <CardContent className="p-6 md:p-8 flex flex-col md:flex-row items-center gap-8">
+          <div className="relative w-32 h-32 flex-shrink-0">
+            <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+              <circle cx="50" cy="50" r="40" fill="transparent" stroke="#ffffff10" strokeWidth="8" />
+              <circle 
+                cx="50" cy="50" r="40" fill="transparent" stroke="#f59e0b" strokeWidth="8"
+                strokeDasharray={`${2 * Math.PI * 40}`}
+                strokeDashoffset={`${2 * Math.PI * 40 * (1 - Math.min(stats.semana.citas / metaServicios, 1))}`}
+                strokeLinecap="round"
+                className="transition-all duration-1000 ease-out"
+              />
+            </svg>
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <span className="text-2xl font-black text-white">{stats.semana.citas}</span>
+              <span className="text-[10px] font-bold text-zinc-500 uppercase">/ {metaServicios}</span>
+            </div>
+          </div>
+          <div className="flex-1 text-center md:text-left z-10">
+            <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/20 px-3 py-1 mb-3">🔥 Reto Semanal</Badge>
+            <h3 className="text-2xl font-black text-white tracking-tight uppercase">Bono por Servicios</h3>
+            <p className="text-zinc-400 text-sm mt-2 max-w-md">
+              {stats.semana.citas >= metaServicios 
+                ? '¡Felicidades! Has alcanzado la meta semanal de servicios. Sigue así para aumentar tu bono.' 
+                : `Te faltan ${metaServicios - stats.semana.citas} servicios esta semana para alcanzar tu bono por meta de cantidad. ¡Tú puedes!`}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Filters & Control */}
       <Card className="border-white/5 bg-zinc-900/30">
@@ -515,18 +581,47 @@ export default function BarberoPage() {
           </Card>
 
           <Card className="bg-gradient-to-br from-zinc-900 to-black border-white/5">
-             <CardContent className="p-6 space-y-4">
-                <div className="flex items-center gap-4">
-                   <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-500">
-                      <Calendar size={20}/>
-                   </div>
-                   <div>
-                      <p className="text-[10px] font-black uppercase text-zinc-500">Próximo día libre</p>
-                      <p className="text-sm font-bold text-white">Lunes, 21 de Abril</p>
-                   </div>
-                </div>
-                <div className="h-px bg-white/5" />
-                <Button variant="outline" size="sm" className="w-full text-[10px] uppercase font-black tracking-widest h-10">Ver Calendario Completo</Button>
+             <CardHeader className="pb-2">
+                <CardTitle className="text-sm">💰 Finanzas Pendientes</CardTitle>
+             </CardHeader>
+             <CardContent className="p-6 space-y-4 pt-2">
+                {finanzas.bonos_pendientes?.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-black text-green-500 uppercase tracking-widest">Bonos Ganados</p>
+                    {finanzas.bonos_pendientes.map((b: any) => (
+                      <div key={b.id} className="flex justify-between items-center text-sm border-b border-white/5 pb-2">
+                        <span className="text-zinc-300 font-bold">{b.motivo}</span>
+                        <span className="text-green-400 font-black">+{formatCurrency(b.monto)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {finanzas.sanciones_pendientes?.length > 0 && (
+                  <div className="space-y-2 mt-4">
+                    <p className="text-[10px] font-black text-red-500 uppercase tracking-widest">Sanciones</p>
+                    {finanzas.sanciones_pendientes.map((s: any) => (
+                      <div key={s.id} className="flex justify-between items-center text-sm border-b border-white/5 pb-2">
+                        <span className="text-zinc-300 font-bold">{s.motivo}</span>
+                        <span className="text-red-400 font-black">-{formatCurrency(s.costo)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                {finanzas.saldo_adelantos > 0 && (
+                  <div className="space-y-2 mt-4">
+                    <p className="text-[10px] font-black text-red-500 uppercase tracking-widest">Adelantos</p>
+                    <div className="flex justify-between items-center text-sm border-b border-white/5 pb-2">
+                      <span className="text-zinc-300 font-bold">Saldo Adelantos</span>
+                      <span className="text-red-400 font-black">-{formatCurrency(finanzas.saldo_adelantos)}</span>
+                    </div>
+                  </div>
+                )}
+
+                {finanzas.total_bonos === 0 && finanzas.total_sanciones === 0 && finanzas.saldo_adelantos === 0 && (
+                  <p className="text-zinc-500 text-xs font-bold text-center">Sin bonos ni deudas pendientes.</p>
+                )}
              </CardContent>
           </Card>
         </div>

@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/Input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { useToast } from '@/components/ui/Toast'
-import { ArrowLeft, Plus, Save, Trash2, Gift, Users, Search, Edit, Flame, Cake, ToggleLeft, ToggleRight, X } from 'lucide-react'
+import { ArrowLeft, Plus, Save, Trash2, Gift, Users, Search, Edit, Flame, Cake, ToggleLeft, ToggleRight, X, UserPlus, CheckCircle2 } from 'lucide-react'
 import { labelTipoRecompensa } from '@/lib/lealtad/helpers'
 import type { LealtadMeta, TipoRecompensa } from '@/types'
 
@@ -65,27 +65,33 @@ export default function AdminLealtadPage() {
   // Cumpleaños verificados hoy
   const [verifs, setVerifs] = useState<any[]>([])
 
-  const [tab, setTab] = useState<'metas' | 'clientes' | 'promociones' | 'cumpleanos'>('metas')
+  // Referidos
+  const [referidos, setReferidos] = useState<any[]>([])
+
+  const [tab, setTab] = useState<'metas' | 'clientes' | 'promociones' | 'cumpleanos' | 'referidos'>('metas')
 
   const loadAll = useCallback(async () => {
     try {
       const params = new URLSearchParams({ filtro })
       if (metaFiltro) params.set('meta_id', metaFiltro)
-      const [mRes, aRes, pRes, vRes] = await Promise.all([
+      const [mRes, aRes, pRes, vRes, rRes] = await Promise.all([
         fetch('/api/lealtad/metas'),
         fetch(`/api/lealtad/admin?${params}`),
         fetch('/api/promociones?activas=false'),
         fetch('/api/cumpleanos'),
+        fetch('/api/referidos'),
       ])
       const mJson = await mRes.json()
       const aJson = await aRes.json()
       const pJson = await pRes.json()
       const vJson = await vRes.json()
+      const rJson = await rRes.json()
       setMetas(mJson.metas ?? [])
       setClientes(aJson.clientes ?? [])
       setCanjes(aJson.canjes ?? [])
       setPromociones(pJson.promociones ?? [])
       setVerifs(vJson.verificaciones ?? [])
+      setReferidos(rJson ?? [])
     } finally {
       setLoading(false)
     }
@@ -142,6 +148,23 @@ export default function AdminLealtadPage() {
     if (!desc) return
     await fetch('/api/lealtad/admin', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ accion: 'otorgar_recompensa', cliente_id: clienteId, descripcion: desc }) })
     success('Recompensa otorgada'); loadAll()
+  }
+
+  // ── Referidos CRUD ──
+  const otorgarDescuentoReferido = async (ref: any) => {
+    if (!confirm(`¿Otorgar descuento/bono a ${ref.recomendante?.nombre}? Se marcará como entregado.`)) return
+    try {
+      const res = await fetch('/api/referidos', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: ref.id, bono_otorgado: true })
+      })
+      if (!res.ok) throw new Error((await res.json()).error)
+      success('Bono de referido otorgado (descuento aplicado)')
+      loadAll()
+    } catch (e) {
+      toastError(e instanceof Error ? e.message : 'Error')
+    }
   }
 
   // ── Promo CRUD ──
@@ -229,7 +252,8 @@ export default function AdminLealtadPage() {
           { key: 'metas', label: 'Metas', icon: Gift },
           { key: 'clientes', label: 'Clientes', icon: Users },
           { key: 'promociones', label: 'Promociones', icon: Flame },
-          { key: 'cumpleanos', label: `Cumpleaños Hoy (${verifs.length})`, icon: Cake },
+          { key: 'cumpleanos', label: `Cumpleaños (${verifs.length})`, icon: Cake },
+          { key: 'referidos', label: `Referidos (${referidos.filter(r => !r.bono_otorgado).length} pend.)`, icon: UserPlus },
         ].map(({ key, label, icon: Icon }) => (
           <Button key={key} variant={tab === key ? 'primary' : 'outline'} onClick={() => setTab(key as any)}>
             <Icon className="w-4 h-4 mr-2" /> {label}
@@ -400,6 +424,66 @@ export default function AdminLealtadPage() {
               </Card>
             ))
           )}
+        </div>
+      )}
+
+      {/* ══ REFERIDOS ══ */}
+      {tab === 'referidos' && (
+        <div className="space-y-4">
+          <div className="bg-purple-500/10 border border-purple-500/20 rounded-2xl p-4 flex items-center gap-3">
+            <UserPlus className="text-purple-400 w-6 h-6" />
+            <div>
+              <p className="text-purple-400 font-black uppercase text-sm">Programa de Referidos</p>
+              <p className="text-zinc-400 text-xs">Clientes que trajeron nuevos clientes. Otorga descuentos en su próxima visita.</p>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto mt-4">
+            <table className="w-full text-sm text-left">
+              <thead>
+                <tr className="text-zinc-500 uppercase text-[10px] tracking-widest border-b border-white/5">
+                  <th className="py-3 px-4">Recomendante (Premio)</th>
+                  <th className="py-3 px-4">Nuevo Cliente</th>
+                  <th className="py-3 px-4">Fecha</th>
+                  <th className="py-3 px-4">Monto Bono</th>
+                  <th className="py-3 px-4 text-center">Estado</th>
+                  <th className="py-3 px-4 text-right">Acción</th>
+                </tr>
+              </thead>
+              <tbody>
+                {referidos.length === 0 && (
+                  <tr><td colSpan={6} className="text-center py-12 text-zinc-600 font-black uppercase tracking-widest">Sin referidos</td></tr>
+                )}
+                {referidos.map((ref) => (
+                  <tr key={ref.id} className="border-b border-white/5 hover:bg-white/5">
+                    <td className="py-4 px-4 font-bold text-white">
+                      {ref.recomendante?.nombre}
+                      <p className="text-xs text-zinc-500 font-normal">{ref.recomendante?.telefono}</p>
+                    </td>
+                    <td className="py-4 px-4 text-zinc-300">
+                      {ref.recomendado?.nombre}
+                      <p className="text-xs text-zinc-500">{ref.recomendado?.telefono}</p>
+                    </td>
+                    <td className="py-4 px-4 text-zinc-500 text-xs">{new Date(ref.fecha).toLocaleDateString('es-BO')}</td>
+                    <td className="py-4 px-4 text-amber-500 font-black">Bs. {ref.monto_bono}</td>
+                    <td className="py-4 px-4 text-center">
+                      {ref.bono_otorgado 
+                        ? <Badge variant="success" className="text-[9px]"><CheckCircle2 size={10} className="inline mr-1" />Entregado</Badge>
+                        : <Badge variant="warning" className="text-[9px]">Pendiente</Badge>
+                      }
+                    </td>
+                    <td className="py-4 px-4 text-right">
+                      {!ref.bono_otorgado && (
+                        <Button size="sm" variant="primary" onClick={() => otorgarDescuentoReferido(ref)}>
+                          Otorgar Descuento
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

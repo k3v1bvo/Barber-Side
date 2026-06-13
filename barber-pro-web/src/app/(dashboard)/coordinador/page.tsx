@@ -17,7 +17,10 @@ import {
   Clock,
   Package,
   ArrowRight,
+  BarChart3,
+  Users
 } from 'lucide-react'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
 interface DaySummary {
   caja_chica: number
@@ -43,6 +46,7 @@ export default function CoordinadorDashboard() {
   const [summary, setSummary] = useState<DaySummary>({ caja_chica: 0, ventas: 0, banco: 0, total: 0, movimientos: 0 })
   const [recentTx, setRecentTx] = useState<RecentTx[]>([])
   const [arqueoCerrado, setArqueoCerrado] = useState(false)
+  const [topBarberos, setTopBarberos] = useState<{nombre: string, ventas: number}[]>([])
   const [loading, setLoading] = useState(true)
   const hoy = new Date().toISOString().split('T')[0]
 
@@ -82,6 +86,30 @@ export default function CoordinadorDashboard() {
         .maybeSingle()
 
       setArqueoCerrado(arqueo?.cerrado ?? false)
+
+      // Top Barberos de la semana
+      const hace7Dias = new Date()
+      hace7Dias.setDate(hace7Dias.getDate() - 7)
+      const { data: citasMes } = await supabase
+        .from('citas')
+        .select('precio, barberos:profiles!barbero_id(full_name)')
+        .eq('estado', 'completado')
+        .gte('fecha_hora', hace7Dias.toISOString())
+
+      const barberosStats: Record<string, number> = {}
+      if (citasMes) {
+        citasMes.forEach((c: any) => {
+          const barberoNombre = c.barberos?.full_name || 'Sin asignar'
+          barberosStats[barberoNombre] = (barberosStats[barberoNombre] || 0) + c.precio
+        })
+      }
+      
+      const arrTopBarberos = Object.entries(barberosStats)
+        .map(([n, v]) => ({ nombre: n, ventas: v }))
+        .sort((a, b) => b.ventas - a.ventas)
+        .slice(0, 5)
+
+      setTopBarberos(arrTopBarberos)
       setLoading(false)
     }
 
@@ -195,9 +223,39 @@ export default function CoordinadorDashboard() {
         </div>
       </div>
 
-      {/* Últimos movimientos */}
-      <Card className="border-white/5 bg-zinc-900/50">
-        <CardContent className="p-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Top Barberos */}
+        <Card className="border-white/5 bg-gradient-to-br from-zinc-900 to-black relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
+          <CardHeader>
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Users className="w-4 h-4 text-purple-500" />
+              Top Barberos (Semana)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-64 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={topBarberos} layout="vertical" margin={{ left: 40 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#ffffff05" />
+                  <XAxis type="number" hide />
+                  <YAxis dataKey="nombre" type="category" stroke="#a1a1aa" fontSize={10} tickLine={false} axisLine={false} width={80} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#09090b', borderColor: '#ffffff10', borderRadius: '12px' }}
+                    itemStyle={{ color: '#a855f7', fontWeight: 'bold' }}
+                    cursor={{fill: '#ffffff05'}}
+                    formatter={(value: any) => formatCurrency(value)} 
+                  />
+                  <Bar dataKey="ventas" fill="#a855f7" radius={[0, 4, 4, 0]} barSize={24} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Últimos movimientos */}
+        <Card className="border-white/5 bg-zinc-900/50">
+          <CardContent className="p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-black uppercase tracking-widest text-zinc-400">
               Últimos movimientos
@@ -242,6 +300,7 @@ export default function CoordinadorDashboard() {
           )}
         </CardContent>
       </Card>
+      </div>
     </div>
   )
 }
