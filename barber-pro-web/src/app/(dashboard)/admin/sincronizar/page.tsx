@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { useToast } from '@/components/ui/Toast'
@@ -111,9 +111,9 @@ export default function SincronizarHistorialPage() {
       <Card className="bg-zinc-900 border-white/5 shadow-2xl">
         <CardHeader>
           <CardTitle className="text-xl text-white">Vincular Operario (Excel) a Perfil (Sistema)</CardTitle>
-          <CardDescription className="text-zinc-400">
+          <p className="text-sm text-zinc-400 mt-2">
             El sistema buscará en las notas de las citas huérfanas el patrón exacto <strong>"Op: [Nombre]."</strong> y las asignará al barbero seleccionado.
-          </CardDescription>
+          </p>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSync} className="space-y-6">
